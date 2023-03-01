@@ -8,15 +8,15 @@ Each score has two chars, the first being what the elf chose, the second being
 what you chose. A an X are Rock, B and Y are Paper, C and Z are Scissors.
 Rules: Rock beats Scissors, Scissors beats Paper, Paper beats Rock."""
 scores: dict[str, int] = \
-    {'A X': 3 + 1,     # Rock A = Rock X
-     'A Y': 6 + 2,     # Paper Y beats Rock A
-     'A Z': 0 + 3,     # Rock A beats Scissors Z
-     'B X': 0 + 1,     # Paper B beats Rock X => 0
-     'B Y': 3 + 2,     # Paper B = Paper Y
-     'B Z': 6 + 3,     # Scissors Z beats Paper B
-     'C X': 6 + 1,     # Rock X beats Scissors C
-     'C Y': 0 + 2,     # Scissors C beats Paper Y
-     'C Z': 3 + 3      # Scissors C = Scissors Z
+    {"A X": 3 + 1,  # Rock A = Rock X
+     "A Y": 6 + 2,  # Paper Y beats Rock A
+     "A Z": 0 + 3,  # Rock A beats Scissors Z
+     "B X": 0 + 1,  # Paper B beats Rock X => 0
+     "B Y": 3 + 2,  # Paper B = Paper Y
+     "B Z": 6 + 3,  # Scissors Z beats Paper B
+     "C X": 6 + 1,  # Rock X beats Scissors C
+     "C Y": 0 + 2,  # Scissors C beats Paper Y
+     "C Z": 3 + 3  # Scissors C = Scissors Z
      }
 
 """Each key has two chars, separated by a space:
@@ -28,15 +28,15 @@ Each value has two chars, separated by a space:
 - the second us your choice such that you comply with the instruction in the 
   key (X = Rock, Y = Paper, Z = Scissors)."""
 choices: dict[str, str] = \
-    {'A X': "A Z",  # Must loose from Rock, so must choose Scissors Z
-     'A Y': "A X",  # Must draw with Rock A, so must choose Rock X
-     'A Z': "A Y",  # Must win from Rock A, so must choose Paper Y
-     'B X': "B X",  # Must loose from Paper B, so must choose Rock X
-     'B Y': "B Y",  # Must draw with Paper B, so must choose Paper Y
-     'B Z': "B Z",  # Must win from Paper B, so must choose Scissors Z
-     'C X': "C Y",  # Must loose from Scissors C, so must choose Peper Y
-     'C Y': "C Z",  # Must draw with Scissors C, so must choose Scissors Z
-     'C Z': "C X",  # Must win from Scissors C, so must choose Rock X
+    {"A X": "A Z",  # Must loose from Rock, so must choose Scissors Z
+     "A Y": "A X",  # Must draw with Rock A, so must choose Rock X
+     "A Z": "A Y",  # Must win from Rock A, so must choose Paper Y
+     "B X": "B X",  # Must loose from Paper B, so must choose Rock X
+     "B Y": "B Y",  # Must draw with Paper B, so must choose Paper Y
+     "B Z": "B Z",  # Must win from Paper B, so must choose Scissors Z
+     "C X": "C Y",  # Must loose from Scissors C, so must choose Peper Y
+     "C Y": "C Z",  # Must draw with Scissors C, so must choose Scissors Z
+     "C Z": "C X",  # Must win from Scissors C, so must choose Rock X
      }
 
 
@@ -68,16 +68,18 @@ def main():
     strategy_scores = get_scores()
 
     solution_1 = strategy_scores[0]
+    solution_2 = strategy_scores[1]
+
+    stop = time.perf_counter_ns()
+
     assert solution_1 == 12772
     print(f"Day 2 part 1: {part_1} {solution_1}")
 
-    solution_2 = strategy_scores[1]
     assert solution_2 == 11618
     print(f"Day 2 part 2: {part_2} {solution_2}")
 
-    stop = time.perf_counter_ns()
-    print(f'Day 2 took {(stop - start) * 10 ** -6:.3f} ms')
+    print(f"Day 2 took {(stop - start) * 10 ** -6:.3f} ms")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

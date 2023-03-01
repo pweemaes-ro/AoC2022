@@ -4,7 +4,7 @@ from types import ModuleType
 from importlib import import_module
 
 
-def aoc_modules(pattern: str = 'Day *.py') -> list[ModuleType]:
+def aoc_modules(pattern: str = "Day *.py") -> list[ModuleType]:
     """Return a list of all loaded module objects imported from files in
     current working directory (cwd) that have the pattern.
     """
@@ -26,7 +26,8 @@ def solve_all():
 
     for module in aoc_modules():
         module.main()
+        print("*" * 30)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     solve_all()

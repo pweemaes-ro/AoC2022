@@ -5,7 +5,7 @@ from AoCLib import intersect_all, union_all
 
 Compartment = set[str]
 Rucksack = set[str]
-Rucksacks = tuple[Rucksack]
+Rucksacks = tuple[Rucksack, ...]
 RucksackAsCompartments = tuple[Compartment, ...]
 RucksacksAsCompartments = tuple[RucksackAsCompartments, ...]
 RucksackGroup = tuple[Rucksack, ...]
@@ -80,21 +80,24 @@ def main():
     with open("input_files/day3.txt") as file:
         compartments = get_rucksacks_as_compartments(file.readlines())
 
-        compartment_intersect_chars = get_compartments_intersects(compartments)
-        solution_1 = sum(map(char_to_priority, compartment_intersect_chars))
-        assert solution_1 == 7875
-        print(f"Day 3 part 1: {part_1} {solution_1}")
+    compartment_intersect_chars = get_compartments_intersects(compartments)
+    solution_1 = sum(map(char_to_priority, compartment_intersect_chars))
 
-        rucksacks = get_rucksacks(compartments)
-        groups = get_rucksack_groups(rucksacks)
-        group_intersect_chars = get_group_intersects(groups)
-        solution_2 = sum(map(char_to_priority, group_intersect_chars))
-        assert solution_2 == 2479
-        print(f"Day 3 part 2: {part_2} {solution_2}")
+    rucksacks = get_rucksacks(compartments)
+    groups = get_rucksack_groups(rucksacks)
+    group_intersect_chars = get_group_intersects(groups)
+    solution_2 = sum(map(char_to_priority, group_intersect_chars))
 
     stop = time.perf_counter_ns()
-    print(f'Day 3 took {(stop - start) * 10 ** -6:.3f} ms')
+
+    assert solution_1 == 7875
+    print(f"Day 3 part 1: {part_1} {solution_1}")
+
+    assert solution_2 == 2479
+    print(f"Day 3 part 2: {part_2} {solution_2}")
+
+    print(f"Day 3 took {(stop - start) * 10 ** -6:.3f} ms")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
