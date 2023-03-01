@@ -9,6 +9,7 @@ from typing import Callable
 
 class Command(StrEnum):
     """The commands + a command marker that are currently supported."""
+
     COMMAND_MARKER = "$"
     CHANGE_DIR = "cd"
     LIST = "ls"
@@ -19,21 +20,23 @@ class FSO:
 
     class FsoTypes(StrEnum):
         """The following types are currently supported in a fso tree."""
+
         DIR = "dir"
         FILE = "file"
 
     class FsoDirs(StrEnum):
         """The following special directory names are currently supported in a
         fso tree."""
+
         ROOT = "/"
         PARENT = ".."
 
     def __init__(self, name: str, fso_type: FsoTypes, size: int = 0) -> None:
         self._name = name
+        self._parent: FSO = self
         self._type = fso_type
         self._size = 0 if type == FSO.FsoTypes.DIR else size
-        self._parent = None     # when 'add'ed, this will be set to self.
-        self._children = []
+        self._children: list[FSO] = []
         self._dirty = False
 
     @property
@@ -46,16 +49,15 @@ class FSO:
     def fso_size(self) -> int:
         """Return the size of this fso."""
 
-        if self._type == FSO.FsoTypes.FILE:
-            return self._size
-        elif self._type == FSO.FsoTypes.DIR:
+        if self._type == FSO.FsoTypes.DIR:
             if self._dirty:
                 self._size = sum(child.fso_size for child in self._children)
                 self._set_dirty(False)
-            return self._size
+
+        return self._size
 
     @property
-    def fso_type(self) -> FSO.fso_size:
+    def fso_type(self) -> FSO.FsoTypes:
         """Return the type ("file" or "dir") of the fso."""
 
         return self._type
@@ -65,6 +67,12 @@ class FSO:
         """Return the parent dir of this fso."""
 
         return self._parent
+
+    def is_root(self) -> bool:
+        """Return True if this is the root fso object (the only one for which
+        the parent is itself."""
+
+        return self._parent == self
 
     def add(self, component: FSO) -> None:
         """Add component as child to this fso. Note: No check whether child
@@ -93,14 +101,14 @@ class FSO:
         flag is cleared for this fso (but not for its parent dirs)."""
 
         self._dirty = dirty
-        if dirty and self._parent:
-            self.parent._set_dirty(dirty)
+        if dirty and not self.is_root():
+            self._parent._set_dirty(dirty)
 
     def child(self, name: str):
         """Return the child of this fso with the specified name."""
 
         for child in self._children:
-            if child.name == name:
+            if child._name == name:
                 return child
 
         raise ValueError(f"Directory '{self._name}' has no child '{name}'.")
@@ -109,7 +117,7 @@ class FSO:
     def root(self) -> FSO:
         """Return the root of the fso."""
         fso = self
-        while fso._parent:
+        while not fso.is_root():
             fso = fso._parent
         return fso
 
@@ -142,6 +150,8 @@ def _process_cd(current_dir: FSO, param: str) -> FSO:
         return current_dir.parent
     elif len(param):
         return current_dir.child(param)
+    else:
+        raise ValueError(f"Unexpected empty param for cd command!")
 
 
 def _add_fso(current_dir: FSO, size_or_dir: str, name: str) -> None:
@@ -202,7 +212,7 @@ def main() -> None:
     assert solution_2 == 8319096
     print(f"Day 7 part 2: {part_2} {solution_2}")
 
-    print(f"Day 6 took {(stop - start) * 10 ** -6:.3f} ms")
+    print(f"Day 7 took {(stop - start) * 10 ** -6:.3f} ms")
 
 
 if __name__ == "__main__":
