@@ -3,32 +3,18 @@ import time
 from dataclasses import dataclass
 
 
-Locations = set[tuple[int, ...]]
-
-
 @dataclass
 class Knot:
-    """A simple iterable dataclass. Iterable is used to unpack Knot in a t
-    tuple when we want to store it in a set."""
+    """A simple hashable (so we can put instances in a set) dataclass."""
 
     x: int
     y: int
 
-    __next_count = 0
+    def __hash__(self):
+        return hash(repr(self))
 
-    def __iter__(self):
-        return self
 
-    def __next__(self):
-        self.__next_count += 1
-
-        if not self.__next_count % 3:
-            raise StopIteration
-
-        if self.__next_count % 3 == 1:
-            return self.x
-        elif self.__next_count % 3 == 2:
-            return self.y
+Locations = set[Knot]
 
 
 def _move_knot(knot: Knot, direction: str) -> None:
@@ -46,14 +32,11 @@ def _move_knot(knot: Knot, direction: str) -> None:
 
 
 def _follow(head: Knot, tail: Knot) -> None:
-    """The heart of the algo: How should a tail at the given location move if
-    it is following the head towards its location?"""
+    """The heart of the solution: How should a tail at the given location move
+    if it is following the head towards its location?"""
 
-    delta_x = head.x - tail.x
-    delta_y = head.y - tail.y
-
-    distance_x = abs(delta_x)
-    distance_y = abs(delta_y)
+    distance_x = abs(head.x - tail.x)
+    distance_y = abs(head.y - tail.y)
 
     if distance_x < 2 and distance_y < 2:
         return
@@ -61,15 +44,8 @@ def _follow(head: Knot, tail: Knot) -> None:
     avg_x = (head.x + tail.x) // 2
     avg_y = (head.y + tail.y) // 2
 
-    if distance_x == 2 and distance_y == 2:
-        tail.x = avg_x
-        tail.y = avg_y
-    elif distance_x == 2:
-        tail.x = avg_x
-        tail.y += delta_y
-    elif distance_y == 2:
-        tail.x += delta_x
-        tail.y = avg_y
+    tail.x = avg_x if distance_x == 2 else head.x
+    tail.y = avg_y if distance_y == 2 else head.y
 
 
 def _execute_step(direction: str,
@@ -81,7 +57,7 @@ def _execute_step(direction: str,
     _move_knot(knots[0], direction)
     for i in range(1, len(knots)):
         _follow(knots[i - 1], knots[i])
-        locations.add(tuple(knots[-1]))
+        locations.add(knots[-1])
 
 
 def _execute_instruction(instruction: str,
@@ -101,7 +77,7 @@ def get_nr_locations(instructions: list[str], nr_knots: int) -> int:
     instructions."""
 
     knots = tuple(Knot(0, 0) for _ in range(nr_knots))
-    locations_visited = {tuple(knots[-1])}
+    locations_visited = {knots[-1]}
 
     for instruction in instructions:
         _execute_instruction(instruction, knots, locations_visited)
