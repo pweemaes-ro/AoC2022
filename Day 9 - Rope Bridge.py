@@ -50,7 +50,8 @@ def _follow(head: Knot, tail: Knot) -> None:
 
 def _execute_step(direction: str,
                   knots: tuple[Knot, ...],
-                  locations: Locations) -> None:
+                  locations: list[Locations],
+                  knots_to_watch: list[int]) -> None:
     """Execute a step in the given direction and after each step move each of
     the tails (if necessary) to keep them in touch with their predecessor."""
 
@@ -59,34 +60,36 @@ def _execute_step(direction: str,
     for i in range(1, len(knots)):
         _follow(knots[i - 1], knots[i])
 
-    # locations.add(knots[-1])
-    locations.add(knots[1])
+    for i, knot_idx in enumerate(knots_to_watch):
+        locations[i].add(knots[knot_idx])
 
 
 def _execute_steps(instruction: str,
                    knots: tuple[Knot, ...],
-                   locations: Locations) -> None:
+                   locations: list[Locations],
+                   knots_to_watch: list[int]) -> None:
     """Execute a single instruction (= one or more steps). This is done by
     sequentially executing each required step (all in the same direction)."""
 
     direction, steps = instruction.split()
     for _ in range(int(steps)):
-        _execute_step(direction, knots, locations)
+        _execute_step(direction, knots, locations, knots_to_watch)
 
 
-def get_nr_locations(instructions: list[str], nr_knots: int) -> int:
+def get_nr_locations(instructions: list[str],
+                     nr_knots: int,
+                     knots_to_watch: list[int]) -> list[int]:
     """Return the nr of locations visited by the last knot in a sequence of
     nr_knots. This is calculated by sequentially executing all (move)
     instructions."""
 
     knots = tuple(Knot(0, 0) for _ in range(nr_knots))
-    # locations_visited = {knots[-1]}
-    locations_visited = {knots[1]}
+    locations_visited = [{knots[i]} for i in knots_to_watch]
 
     for instruction in instructions:
-        _execute_steps(instruction, knots, locations_visited)
+        _execute_steps(instruction, knots, locations_visited, knots_to_watch)
 
-    return len(locations_visited)
+    return [len(locations) for locations in locations_visited]
 
 
 def main() -> None:
@@ -103,13 +106,10 @@ def main() -> None:
     with open("input_files/day9.txt") as input_file:
         instructions = input_file.readlines()
 
-    solutions: list[int] = []
-
-    for nr_knots in (2, 10):
-        nr_locations = get_nr_locations(instructions, nr_knots)
-        solutions.append(nr_locations)
-
-    solution_1, solution_2 = solutions
+    locations_counts = get_nr_locations(instructions,
+                                        nr_knots=10,
+                                        knots_to_watch=[1, 9])
+    solution_1, solution_2 = locations_counts
 
     stop = time.perf_counter_ns()
 
