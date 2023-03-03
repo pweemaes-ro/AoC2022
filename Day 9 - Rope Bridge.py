@@ -55,16 +55,19 @@ def _execute_step(direction: str,
     the tails (if necessary) to keep them in touch with their predecessor."""
 
     _move_knot(knots[0], direction)
+
     for i in range(1, len(knots)):
         _follow(knots[i - 1], knots[i])
-        locations.add(knots[-1])
+
+    # locations.add(knots[-1])
+    locations.add(knots[1])
 
 
-def _execute_instruction(instruction: str,
-                         knots: tuple[Knot, ...],
-                         locations: Locations) -> None:
-    """Execute a single instruction. This is done by sequentially executing
-    single steps (one up, down, left or right)."""
+def _execute_steps(instruction: str,
+                   knots: tuple[Knot, ...],
+                   locations: Locations) -> None:
+    """Execute a single instruction (= one or more steps). This is done by
+    sequentially executing each required step (all in the same direction)."""
 
     direction, steps = instruction.split()
     for _ in range(int(steps)):
@@ -77,10 +80,11 @@ def get_nr_locations(instructions: list[str], nr_knots: int) -> int:
     instructions."""
 
     knots = tuple(Knot(0, 0) for _ in range(nr_knots))
-    locations_visited = {knots[-1]}
+    # locations_visited = {knots[-1]}
+    locations_visited = {knots[1]}
 
     for instruction in instructions:
-        _execute_instruction(instruction, knots, locations_visited)
+        _execute_steps(instruction, knots, locations_visited)
 
     return len(locations_visited)
 
