@@ -28,7 +28,7 @@ def get_rucksacks_as_compartments(raw_file_lines: list[str]) \
     rucksack."""
 
     return tuple([(set(raw_line[:len(raw_line) // 2]),
-                   set(raw_line[len(raw_line) // 2:len(raw_line) - 1]))
+                   set(raw_line[len(raw_line) // 2:-1]))
                   for raw_line in raw_file_lines])
 
 

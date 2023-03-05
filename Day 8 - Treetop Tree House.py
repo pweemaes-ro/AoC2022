@@ -21,27 +21,29 @@ TreeRow = list[Tree]
 TreeMatrix = list[TreeRow]
 
 
+def _get_scenic_score(tree: Tree, other_trees: TreeRow) -> int:
+    """Return the scenic score for the tree. This is the nr of trees until a
+    larger or equally large tree is encountered."""
+
+    score = 0
+
+    for other_tree in other_trees:
+        score += 1
+        if tree.height <= other_tree.height:
+            break
+
+    return score
+
+
 def _set_visibility(tree: Tree, largest_height_so_far: int) -> int:
     """Set tree visibility to True if tree is higher than the highest tree
-    in the row so far. Return (the possibly new value for) the height of the 
+    in the row so far. Return (the possibly new value for) the height of the
     highest tree in the row"""
 
     if tree.height > largest_height_so_far:
         largest_height_so_far = tree.height
         tree.visible = True
     return largest_height_so_far
-
-
-def _get_scenic_score(tree: Tree, other_trees: TreeRow) -> int:
-    """Return the scenic score for the tree. This is the nr of trees until a
-    larger or equally large tree is encountered."""
-
-    score = 0
-    for other_tree in other_trees:
-        score += 1
-        if tree.height <= other_tree.height:
-            break
-    return score
 
 
 def _process_directed_row(tree_row: TreeRow) -> None:
@@ -73,13 +75,7 @@ def _process_matrix(matrix: TreeMatrix) -> None:
         _process_row(tree_row)
 
 
-def count_visible_trees(matrix: TreeMatrix) -> int:
-    """Return the nr of trees visible from the outside."""
-
-    return sum(tree.visible for row in matrix for tree in row)
-
-
-def update_scenic_score_products(matrix: TreeMatrix) -> None:
+def _update_scenic_score_products(matrix: TreeMatrix) -> None:
     """Calculates and sets the product of the tree's 4 scenics scores."""
 
     for tree_row in matrix:
@@ -87,12 +83,16 @@ def update_scenic_score_products(matrix: TreeMatrix) -> None:
             tree.scenic_score = prod(tree.scenic_scores)
 
 
-def build_matrix(data_lines: list[str]) -> TreeMatrix:
-    """Build a matrix of trees with height according to data in data_lines."""
+def get_max_scenic_score(matrix: TreeMatrix):
+    """Return the maximum scenic score found in the matric of trees."""
 
-    return [[Tree(int(s))
-             for s in data_line[:len(data_line) - 1]]
-            for data_line in data_lines]
+    return max([tree.scenic_score for tree_row in matrix for tree in tree_row])
+
+
+def count_visible_trees(matrix: TreeMatrix) -> int:
+    """Return the nr of trees visible from the outside."""
+
+    return sum(tree.visible for row in matrix for tree in row)
 
 
 def set_visibility_and_scores(matrix: TreeMatrix):
@@ -102,12 +102,14 @@ def set_visibility_and_scores(matrix: TreeMatrix):
     for directed_matrix in (matrix, transposed(matrix)):
         _process_matrix(directed_matrix)
 
-    update_scenic_score_products(matrix)
+    _update_scenic_score_products(matrix)
 
 
-def get_max_scenic_score(matrix: TreeMatrix):
-    """Return the maximum scenic score found in the matric of trees."""
-    return max([tree.scenic_score for tree_row in matrix for tree in tree_row])
+def build_matrix(lines: list[str]) -> TreeMatrix:
+    """Build a matrix of trees with height according to data in lines. Notice
+    that all lines have "\n" so ignore last char on each line."""
+
+    return [[Tree(int(s)) for s in line[:-1]] for line in lines]
 
 
 def main():

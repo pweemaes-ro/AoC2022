@@ -165,7 +165,7 @@ def build_fso_tree(all_lines: list[str], current_dir: FSO) -> None:
     """Build the fso tree from data in all_lines."""
 
     for line in all_lines:
-        terms = line[:len(line)-1].split(" ")
+        terms = line.split()
 
         match terms[0]:
             case Command.COMMAND_MARKER:

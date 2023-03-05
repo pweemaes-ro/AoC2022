@@ -1,17 +1,24 @@
 """Day 9: Rope Bridge."""
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
 class Knot:
-    """A simple hashable (so we can put instances in a set) dataclass."""
+    """A simple dataclass."""
 
     x: int
     y: int
+    _locations: set[tuple[int, ...]] = field(default_factory=set)
 
-    def __hash__(self):
-        return hash(repr(self))
+    def add_current_location(self):
+        """Adds current location to set of visited locations."""
+        self._locations.add((self.x, self.y))
+
+    def nr_locations(self) -> int:
+        """ Return the nr of locations visited (so far) by this knot."""
+
+        return len(self._locations)
 
 
 Locations = set[Knot]
@@ -50,8 +57,7 @@ def _follow(head: Knot, tail: Knot) -> None:
 
 def _execute_step(direction: str,
                   knots: tuple[Knot, ...],
-                  locations: list[Locations],
-                  knots_to_watch: list[int]) -> None:
+                  knot_idxs_to_watch: tuple[int, ...]) -> None:
     """Execute a step in the given direction and after each step move each of
     the tails (if necessary) to keep them in touch with their predecessor."""
 
@@ -60,36 +66,35 @@ def _execute_step(direction: str,
     for i in range(1, len(knots)):
         _follow(knots[i - 1], knots[i])
 
-    for i, knot_idx in enumerate(knots_to_watch):
-        locations[i].add(knots[knot_idx])
+    for knot_idx in knot_idxs_to_watch:
+        knots[knot_idx].add_current_location()
 
 
 def _execute_steps(instruction: str,
                    knots: tuple[Knot, ...],
-                   locations: list[Locations],
-                   knots_to_watch: list[int]) -> None:
+                   knot_idxs_to_watch: tuple[int, ...]) -> None:
     """Execute a single instruction (= one or more steps). This is done by
     sequentially executing each required step (all in the same direction)."""
 
     direction, steps = instruction.split()
     for _ in range(int(steps)):
-        _execute_step(direction, knots, locations, knots_to_watch)
+        _execute_step(direction, knots, knot_idxs_to_watch)
 
 
 def get_nr_locations(instructions: list[str],
                      nr_knots: int,
-                     knots_to_watch: list[int]) -> list[int]:
+                     knot_idxs_to_watch: tuple[int, ...]) -> tuple[int, ...]:
     """Return the nr of locations visited by the last knot in a sequence of
     nr_knots. This is calculated by sequentially executing all (move)
     instructions."""
 
     knots = tuple(Knot(0, 0) for _ in range(nr_knots))
-    locations_visited = [{knots[i]} for i in knots_to_watch]
 
     for instruction in instructions:
-        _execute_steps(instruction, knots, locations_visited, knots_to_watch)
+        _execute_steps(instruction, knots, knot_idxs_to_watch)
 
-    return [len(locations) for locations in locations_visited]
+    return tuple(knots[knot_idx].nr_locations()
+                 for knot_idx in knot_idxs_to_watch)
 
 
 def main() -> None:
@@ -106,10 +111,9 @@ def main() -> None:
     with open("input_files/day9.txt") as input_file:
         instructions = input_file.readlines()
 
-    locations_counts = get_nr_locations(instructions,
-                                        nr_knots=10,
-                                        knots_to_watch=[1, 9])
-    solution_1, solution_2 = locations_counts
+    solution_1, solution_2 = get_nr_locations(instructions,
+                                              nr_knots=10,
+                                              knot_idxs_to_watch=(1, 9))
 
     stop = time.perf_counter_ns()
 

@@ -51,13 +51,13 @@ def main():
     #  [72, 92, 48, 88],
     #  [36, 37, 37, 52]]
     # We use a list-generator expression that for each line from the file:
-    # 1. removes last char "\n": line[:len(line) - 1]
+    # 1. removes last char "\n": line[-1]
     # 2. replaces the "," with "-": replace(",", "-")
     # 3. splits on "-": split("-"), and
     # 4. converts strings from split to ints: int(s) for s in ....split("-").
     lists_of_ints = [
         [int(s)
-         for s in line[:len(line) - 1].replace(",", "-").split("-")]
+         for s in line.replace(",", "-").split("-")]
         for line in lines]
 
     containment = overlap = 0

@@ -19,8 +19,12 @@ def _line_to_labels(line):
     (anywhere) are replaced by empty strings ("")."""
 
     nr_labels = len(line) // 4
-    return [line[i * 4 + 1] for i in range(nr_labels)] + \
-        [" " for _ in range(9 - nr_labels)]
+
+    labels = [line[i * 4 + 1] for i in range(nr_labels)]
+    extra_blanks = [" " for _ in range(9 - nr_labels)]
+
+    return labels + extra_blanks
+
 
 
 def _remove_blanks(stack: list[str]) -> list[str]:
