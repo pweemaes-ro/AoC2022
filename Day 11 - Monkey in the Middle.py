@@ -85,17 +85,6 @@ class Monkey:
         return self.on_success if divisible else self.on_fail
 
 
-def _line_to_id(line: str) -> int:
-    """Convert line to monkey id. Example:
-    'Monkey 0:\n' -> 0
-    If EOF then -1 is returned."""
-
-    if not line:
-        return -1
-
-    return int(line.split()[-1][:-1])
-
-
 def _operation_add(term: int) -> Operation:
     """Return a function that takes n and prime as params, and returns
     a) if not prime: n is interpreted as a number and the function returns the
@@ -149,6 +138,36 @@ def _operation_square(prime: int, n: int) -> int:
     return result
 
 
+def _line_to_id(line: str) -> int:
+    """Convert line to monkey id. Example:
+    'Monkey 0:\n' -> 0
+    If EOF then -1 is returned."""
+
+    if not line:
+        return -1
+
+    return int(line.split()[-1][:-1])
+
+
+def _line_to_starting_values(line: str) -> Queue[Item]:
+    """Reaa starting values from line, convert to ints and put it in a Queue.
+    Return the queue."""
+
+    #     """Convert line to list of ints. Example:
+    #     '  Starting items: 73, 77\n' -> [73, 77]
+    start_values = [int(i) for i in line.split(":")[-1].split(",")]
+
+    # put the ints in a queue of Item objects, and for each item also set the
+    # initial modulo's for all primes from 2 to 19.
+    items_queue: Queue[Item] = Queue()
+    for initial_worry_level in start_values:
+        item = Item(worry_level=initial_worry_level)
+        item.set_initial_modulos()
+        items_queue.put(item)
+
+    return items_queue
+
+
 def _line_to_operation(line: str) -> Operation:
     """Convert line to operation lambda. Example:
     '  Operation: new = old * 5\n' returns _add(5)."""
@@ -184,26 +203,10 @@ def _line_to_destination(line: str) -> int:
     return int(line.split()[-1])
 
 
-def _line_to_starting_values(line: str) -> Queue[Item]:
-    """Reaa starting values from line, convert to ints and put it in a Queue.
-    Return the queue."""
-
-    #     """Convert line to list of ints. Example:
-    #     '  Starting items: 73, 77\n' -> [73, 77]
-    start_values = [int(i) for i in line.split(":")[-1].split(",")]
-
-    # put the ints in a queue of Item objects, and for each item also set the
-    # initial modulo's for all primes from 2 to 19.
-    items_queue: Queue[Item] = Queue()
-    for initial_worry_level in start_values:
-        item = Item(worry_level=initial_worry_level)
-        item.set_initial_modulos()
-        items_queue.put(item)
-
-    return items_queue
-
-
 def _read_monkey(data_file: IO) -> Monkey | None:
+    """Read and return a single Monkey from data file. Return None if no more
+    monkeys to read."""
+
     monkey_id = _line_to_id(data_file.readline())
     if monkey_id == -1:     # EOF, no more monkeys
         return None
@@ -223,30 +226,24 @@ def _read_monkey(data_file: IO) -> Monkey | None:
                   fail_destination)
 
 
-def read_monkeys(data_file: IO) -> dict[int, Monkey]:
-    """Create and return monkeys from data in data_file."""
+def read_monkeys(data_file: IO) -> list[Monkey]:
+    """Create and return a list of Monkeys from data in data_file."""
 
-    # TODO: Why use an expensive dict? The monkeys come in order and
-    #  list/tuples are always order by order of insertion...
-
-    monkeys: dict[int, Monkey] = dict()
+    monkeys: list[Monkey] = list()
 
     while monkey := _read_monkey(data_file):
-        monkeys[monkey.monkey_id] = monkey
+        monkeys.append(monkey)
 
     return monkeys
 
 
-def _play_monkey(monkey_id: int,
-                 monkeys: dict[int, Monkey],
+def _play_monkey(monkey: Monkey,
+                 monkeys: list[Monkey],
                  part_1: bool) -> None:
-    """Process all items for monkey with given id."""
-
-    monkey = monkeys[monkey_id]
+    """Process all items for give Monkey."""
 
     while monkey.items.qsize():
         monkey.inspection_count += 1
-
         item = monkey.items.get()
 
         if part_1:
@@ -257,28 +254,25 @@ def _play_monkey(monkey_id: int,
         monkeys[destination].items.put(item)
 
 
-def _play_round(monkeys: dict[int, Monkey], part_1: bool) -> None:
+def _play_round(monkeys: list[Monkey], part_1: bool) -> None:
     """Play one round, that is, let all monkeys (in order) process the items
     they're holding (in order)."""
 
-    nr_monkeys = len(monkeys)
-
-    for monkey_id in range(nr_monkeys):
-        _play_monkey(monkey_id, monkeys, part_1)
+    for monkey in monkeys:
+        _play_monkey(monkey, monkeys, part_1)
 
 
-def do_monkey_business(monkeys: dict[int, Monkey],
+def do_monkey_business(monkeys: list[Monkey],
                        rounds: int,
                        part_1: bool = False) -> int:
     """Process all rounds for all monkeys and return the 'level of monkey
-    business (the product of the top 2 nr of items inspected amonst all
+    business' (the product of the top 2 most items inspected amonst all
     monkeys)."""
 
     for current_round in range(rounds):
         _play_round(monkeys, part_1)
 
-    return prod(nlargest(2, (m.inspection_count
-                             for m in monkeys.values())))
+    return prod(nlargest(2, (m.inspection_count for m in monkeys)))
 
 
 def main() -> None:
