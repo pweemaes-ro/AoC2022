@@ -1,7 +1,9 @@
 """Day 11: Monkey in the Middle."""
+from __future__ import annotations
 import operator
 import time
 from dataclasses import dataclass, field
+from functools import wraps
 from heapq import nlargest
 from io import StringIO
 from math import prod, floor
@@ -31,14 +33,17 @@ class Item:
     # prime modulo's.). The following simple theorems allow for that:
     #   if n % p = a then (n * x) % p = (a * (n % p)) % p
     #   if n % p = a then (n + x) % p = (a + (n % p)) % p
-
     current_modulos: dict[int, int] = field(default_factory=dict)  # part 2
 
     def set_initial_modulos(self) -> None:
-        """Initializes the modulos for the current value"""
+        """Initializes the modulos for the current value (supposedly the
+        starting value)."""
 
         self.current_modulos = {p: self.worry_level % p
                                 for p in (2, 3, 5, 7, 11, 13, 17, 19, 23)}
+
+
+Operation = Callable[[int, int], int]
 
 
 @dataclass
@@ -46,8 +51,8 @@ class Monkey:
     """Represents a monkey, holding items etc."""
 
     monkey_id: int
-    items: Queue = field()
-    operation: Callable[[int, int], int]
+    items: Queue[Item] = field()
+    operation: Operation
     test_divisor: int       # divisibility by this nr determines destination
     on_success: int         # destination if divisible by test_divisor
     on_fail: int            # destination if NOT divisible by test_divisor
@@ -59,13 +64,10 @@ class Monkey:
         # TODO: The name of this method is misleading, since it does more than
         #       just returning the destination. It also UPDATES the modulos.
 
-        # item.current_modulos = {prime: self.operation(prime, current_modulo)
-        #                         for prime, current_modulo in
-        #                         item.current_modulos.items()}
         for prime, current_modulo in item.current_modulos.items():
             item.current_modulos[prime] = self.operation(prime, current_modulo)
 
-        divisible = (item.current_modulos[self.test_divisor] == 0)
+        divisible = item.current_modulos[self.test_divisor] == 0
         return self.on_success if divisible else self.on_fail
 
     def get_item_destination_part_1(self, item: Item) -> int:
@@ -94,7 +96,7 @@ def _line_to_id(line: str) -> int:
     return int(line.split()[-1][:-1])
 
 
-def _operation_add(term: int) -> Callable[[int, int], int]:
+def _operation_add(term: int) -> Operation:
     """Return a function that takes n and prime as params, and returns
     a) if not prime: n is interpreted as a number and the function returns the
        sum (n + term) (in solving part 1),
@@ -103,6 +105,7 @@ def _operation_add(term: int) -> Callable[[int, int], int]:
        worry level modulo prime had we done the actual addition on worry level
        (in solving part 2)."""
 
+    @wraps(_operation_add)
     def _inner(prime: int, n: int) -> int:
         result = n + term
         if prime:
@@ -112,7 +115,7 @@ def _operation_add(term: int) -> Callable[[int, int], int]:
     return _inner
 
 
-def _operation_mul_by(factor: int) -> Callable[[int, int], int]:
+def _operation_mul_by(factor: int) -> Operation:
     """Return a function that takes prime and n as params, and returns
     a) if not prime: n is interpreted as a number and the function returns the
        product (n * term) (in solving part 1),
@@ -121,6 +124,7 @@ def _operation_mul_by(factor: int) -> Callable[[int, int], int]:
        worry level modulo prime had we done the actual multiplication on worry
        level (in solving part 2)."""
 
+    @wraps(_operation_mul_by)
     def _inner(prime: int, n: int) -> int:
         result = n * factor
         if prime:
@@ -145,7 +149,7 @@ def _operation_square(prime: int, n: int) -> int:
     return result
 
 
-def _line_to_operation(line: str) -> Callable[[int, int], int]:
+def _line_to_operation(line: str) -> Operation:
     """Convert line to operation lambda. Example:
     '  Operation: new = old * 5\n' returns _add(5)."""
 
@@ -164,7 +168,7 @@ def _line_to_operation(line: str) -> Callable[[int, int], int]:
         raise ValueError(f"Unexpected operator '{operator}'")
 
 
-def _line_to_test_divisor(line) -> int:
+def _line_to_test_divisor(line: str) -> int:
     """Convert line to test lambda. Example:
       'Test: divisible by 11\n' -> lambda: x: x % 11 == 0"""
 
@@ -172,7 +176,7 @@ def _line_to_test_divisor(line) -> int:
     return int(line.split()[-1])
 
 
-def _line_to_destination(line) -> int:
+def _line_to_destination(line: str) -> int:
     """Convert line to test lambda. Example:
     '    If true: throw to monkey 6\n' -> 6
     '    If false: throw to monkey 3\n' -> 3"""
@@ -191,8 +195,8 @@ def _line_to_starting_values(line: str) -> Queue[Item]:
     # put the ints in a queue of Item objects, and for each item also set the
     # initial modulo's for all primes from 2 to 19.
     items_queue: Queue[Item] = Queue()
-    for value in start_values:
-        item = Item(worry_level=value)
+    for initial_worry_level in start_values:
+        item = Item(worry_level=initial_worry_level)
         item.set_initial_modulos()
         items_queue.put(item)
 
@@ -222,6 +226,9 @@ def _read_monkey(data_file: IO) -> Monkey | None:
 def read_monkeys(data_file: IO) -> dict[int, Monkey]:
     """Create and return monkeys from data in data_file."""
 
+    # TODO: Why use an expensive dict? The monkeys come in order and
+    #  list/tuples are always order by order of insertion...
+
     monkeys: dict[int, Monkey] = dict()
 
     while monkey := _read_monkey(data_file):
@@ -230,7 +237,9 @@ def read_monkeys(data_file: IO) -> dict[int, Monkey]:
     return monkeys
 
 
-def _play_monkey(monkey_id, monkeys: dict[int, Monkey], part_1: bool) -> None:
+def _play_monkey(monkey_id: int,
+                 monkeys: dict[int, Monkey],
+                 part_1: bool) -> None:
     """Process all items for monkey with given id."""
 
     monkey = monkeys[monkey_id]
