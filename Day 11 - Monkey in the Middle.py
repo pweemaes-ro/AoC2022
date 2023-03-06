@@ -10,6 +10,7 @@ from math import prod, floor
 from queue import Queue
 from typing import Callable, IO
 
+
 @dataclass
 class Item:
     """An item."""

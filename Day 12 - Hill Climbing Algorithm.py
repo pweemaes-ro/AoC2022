@@ -10,9 +10,17 @@ class MazeStrategy(ABC):
     """Abstract class for strategy to be used when searching for shortest
     path."""
 
+    def __init__(self, start_pos: Coordinate):
+        self._start_pos = start_pos
+
+    @property
+    def start_pos(self) -> Coordinate:
+        """Return the start position for this strategy."""
+        return self._start_pos
+
     @abstractmethod
     def is_finish(self, matrix: Matrix, coordinate: Coordinate) -> bool:
-        """Return true when found what we were looking for, else False. Must
+        """Return True when found what we were looking for, else False. Must
         be implemented by concrete classes."""
 
         ...
@@ -22,7 +30,7 @@ class MazeStrategy(ABC):
                     matrix: Matrix,
                     current: Coordinate,
                     neighbor: Coordinate) -> bool:
-        """Return true when the step from current to neighbor is allowed
+        """Return True when the step from current to neighbor is allowed
         (notice that this is the last test before a neighbor is accepted, so
         it is on the grid and not already visited before). Must be implemented
         by concrete classes."""
@@ -34,24 +42,26 @@ def neighbor_validator(matrix: Matrix,
                        current: Coordinate,
                        neighbor: Coordinate,
                        climbing: bool) -> bool:
-    """Checks if stepping from current to neighbor is too steep
-    (neighbor may not be more than 1 level higher than current).
-    If climbing (in closure) is False, then returns True iif the
-    descent is at most 1."""
+    """Checks if stepping from current to neighbor is too steep. If climbing
+    return True iif neighbor is at most one level higher than current.
+    If climbing is False return True if neighbor is at most one level lower
+    than current."""
 
-    current_value = ord(matrix[current.y][current.x])
-    neighbor_value = ord(matrix[neighbor.y][neighbor.x])
-    if not climbing:
-        return current_value - neighbor_value <= 1
-    else:
+    current_value = matrix.coordinate_value(current)
+    neighbor_value = matrix.coordinate_value(neighbor)
+
+    if climbing:
         return neighbor_value - current_value <= 1
+    else:
+        return current_value - neighbor_value <= 1
 
 
 class AToZStrategy(MazeStrategy):
     """Implementation of the strategy for part 1: Finished when the finish_pos
     has been reached, level difference at most 1 assuming climbing."""
 
-    def __init__(self, finish_pos: Coordinate):
+    def __init__(self, start_pos: Coordinate, finish_pos: Coordinate):
+        super().__init__(start_pos)
         self._finish_pos = finish_pos
 
     def neighbor_ok(self,
@@ -83,7 +93,7 @@ class ZToAStrategy(MazeStrategy):
         return neighbor_validator(matrix, current, neighbor, climbing=False)
 
     def is_finish(self, matrix: Matrix, coordinate: Coordinate) -> bool:
-        """Return True if matrix content at coordinate is "a" """
+        """Return True if matrix content at coordinate is "a"."""
 
         return matrix[coordinate.y][coordinate.x] == "a"
 
@@ -103,18 +113,14 @@ class Coordinate:
 class Matrix(list):
     """Matrix class is just a list (of strings) with minimal functionalitie."""
 
-    def __init__(self, lines):
+    def __init__(self, lines: list[str]):
         super().__init__(lines)
 
-    def find(self, start: Coordinate, search_for: str) -> Coordinate | None:
-        """Find the first occurence of search_for starting at start coordinate.
-        If found, return found location as a coordinate, else return None."""
+    def coordinate_value(self, coordinate: Coordinate) -> int:
+        """Return the ordinol of the char at the given coordinate in the
+        matrix."""
 
-        for y in range(start.y, len(self)):
-            x_offset = start.x if y == start.y else 0
-            search_in = self[y][x_offset:]
-            if (x := search_in.find(search_for)) != -1:
-                return Coordinate(x + (start.x if y == start.y else 0), y)
+        return ord(self[coordinate.y][coordinate.x])
 
     def replace(self, old: str, new: str) -> Coordinate | None:
         """Find the first occurence of old in the maze's matrix, replace it
@@ -125,13 +131,15 @@ class Matrix(list):
                 self[y] = self[y].replace(old, new)
                 return Coordinate(x, y)
 
+        return None
+
 
 @dataclass
 class Maze:
-    """Class representing a maze, with start and finish coordinates and a set
-    of already visited coordinates."""
+    """Class representing a maze. The matrix holds the content (str's of
+    length 1). Searching uses an instance of a MazeStrategy concrete class."""
 
-    matrix: Matrix = field(default_factory=Matrix)
+    matrix: Matrix
     visited: set[Coordinate] = field(default_factory=set)
 
     def _is_ongrid(self, coordinate: Coordinate) -> bool:
@@ -139,11 +147,6 @@ class Maze:
 
         return 0 <= coordinate.x < len(self.matrix[0]) \
             and 0 <= coordinate.y < len(self.matrix)
-
-    def _get_value(self, coordinate: Coordinate) -> int:
-        """Return the value of the matrix at the coordinate."""
-
-        return ord(self.matrix[coordinate.y][coordinate.x])
 
     def get_neigbors(self, current: Coordinate, strategy: MazeStrategy) \
             -> list[Coordinate]:
@@ -174,16 +177,14 @@ class Maze:
 
         return neighbors
 
-    def find_shortest_path(self,
-                           start: Coordinate,
-                           strategy: MazeStrategy):
+    def find_shortest_path(self, strategy: MazeStrategy) -> int | None:
         """Find and return the length of the shortest path in the maze from its
         start location to it finish location. Return None if there was no such
         path"""
 
-        self.visited = {start}
-        paths_queue = Queue()
-        paths_queue.put((start, 0))
+        self.visited = {strategy.start_pos}
+        paths_queue: Queue[tuple[Coordinate, int]] = Queue()
+        paths_queue.put((strategy.start_pos, 0))
 
         while paths_queue.qsize():
             current_coordinate, current_steps = \
@@ -195,6 +196,8 @@ class Maze:
 
                 self.visited.add(neighbor)
                 paths_queue.put((neighbor, current_steps + 1))
+
+        return None
 
 
 def get_maze(file: str) -> Maze:
@@ -222,8 +225,8 @@ def main():
     start_pos = maze.matrix.replace("S", "a")
     finish_pos = maze.matrix.replace("E", "z")
 
-    solution_1 = maze.find_shortest_path(start_pos, AToZStrategy(finish_pos))
-    solution_2 = maze.find_shortest_path(finish_pos, ZToAStrategy())
+    solution_1 = maze.find_shortest_path(AToZStrategy(start_pos, finish_pos))
+    solution_2 = maze.find_shortest_path(ZToAStrategy(finish_pos))
 
     stop = time.perf_counter_ns()
 

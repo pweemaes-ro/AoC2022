@@ -26,7 +26,6 @@ def _line_to_labels(line):
     return labels + extra_blanks
 
 
-
 def _remove_blanks(stack: list[str]) -> list[str]:
     """Removes all " " items from the stack."""
 
