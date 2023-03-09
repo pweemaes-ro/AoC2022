@@ -3,7 +3,7 @@ import time
 from copy import deepcopy
 from typing import IO
 
-from AoCLib import transposed
+from AoCLib.Miscellaneous import transposed
 
 Stack = list[str]
 Stacks = list[Stack]

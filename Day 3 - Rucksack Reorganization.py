@@ -1,7 +1,7 @@
 """Day 3: Rucksack Reorganization"""
 import time
 
-from AoCLib import intersect_all, union_all
+from AoCLib.Miscellaneous import intersect_all, union_all
 
 Compartment = set[str]
 Rucksack = set[str]

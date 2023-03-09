@@ -26,9 +26,11 @@ def solve_all():
     """Solve all available puzzles by calling main on all available (and
     imported) modules."""
 
+    print("*" * 50)
     for module in aoc_modules():
+        print(module.__name__)
         module.main()
-        print("*" * 30)
+        print("*" * 50)
 
 
 if __name__ == "__main__":

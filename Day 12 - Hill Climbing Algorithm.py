@@ -2,7 +2,7 @@
 from __future__ import annotations
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from queue import Queue
 
 
@@ -25,6 +25,13 @@ class MazeStrategy(ABC):
 
         ...
 
+    @staticmethod
+    def _is_ongrid(matrix: Matrix, coordinate: Coordinate) -> bool:
+        """Return True if coordinate is on the grid, else False."""
+
+        return 0 <= coordinate.x < len(matrix[0]) \
+            and 0 <= coordinate.y < len(matrix)
+
     @abstractmethod
     def neighbor_ok(self,
                     matrix: Matrix,
@@ -37,14 +44,20 @@ class MazeStrategy(ABC):
 
         ...
 
+    @ abstractmethod
+    def on_visit(self, matrix: Matrix, coordinate: Coordinate) -> None:
+        """Called wheneven a coordinate is visited."""
 
-def neighbor_validator(matrix: Matrix,
-                       current: Coordinate,
-                       neighbor: Coordinate,
-                       climbing: bool) -> bool:
-    """Checks if stepping from current to neighbor is too steep. If climbing
+        ...
+
+
+def height_validator(matrix: Matrix,
+                     current: Coordinate,
+                     neighbor: Coordinate,
+                     climbing: bool) -> bool:
+    """Checks if stepping from current to neighbor is too steep. If climbing:
     return True iif neighbor is at most one level higher than current.
-    If climbing is False return True if neighbor is at most one level lower
+    If climbing is False: return True if neighbor is at most one level lower
     than current."""
 
     current_value = matrix.coordinate_value(current)
@@ -56,46 +69,75 @@ def neighbor_validator(matrix: Matrix,
         return current_value - neighbor_value <= 1
 
 
-class AToZStrategy(MazeStrategy):
+class AscendingStrategy(MazeStrategy):
     """Implementation of the strategy for part 1: Finished when the finish_pos
     has been reached, level difference at most 1 assuming climbing."""
 
     def __init__(self, start_pos: Coordinate, finish_pos: Coordinate):
         super().__init__(start_pos)
         self._finish_pos = finish_pos
+        self.visited: set[Coordinate] = set()
 
     def neighbor_ok(self,
                     matrix: Matrix,
                     current: Coordinate,
                     neighbor: Coordinate) -> bool:
-        """Return True if neighbor is at most one level higher than current,
-        else False."""
+        """Return True if neighbor if 'valid', that is, on grid, not visited
+        yet, and not high/low relative to current."""
 
-        return neighbor_validator(matrix, current, neighbor, climbing=True)
+        if neighbor in self.visited:
+            return False
+
+        if not self._is_ongrid(matrix, neighbor):
+            return False
+
+        return height_validator(matrix, current, neighbor, climbing=True)
 
     def is_finish(self, matrix: Matrix, coordinate: Coordinate) -> bool:
         """Return True if the coordinate is the finish position, else False."""
 
         return coordinate == self._finish_pos
 
+    # noinspection PyUnusedLocal
+    def on_visit(self, matrix: Matrix, coordinate: Coordinate) -> None:
+        """Called wheneven a coordinate is visited."""
 
-class ZToAStrategy(MazeStrategy):
+        self.visited.add(coordinate)
+
+
+class DescendingToLowestLevel(MazeStrategy):
     """Implementation of the strategy for part 1: Finished when the finish_pos
     has been reached, level difference at most 1 assuming climbing."""
+
+    def __init__(self, start_pos: Coordinate):
+        super().__init__(start_pos)
+        self.visited: set[Coordinate] = set()
 
     def neighbor_ok(self,
                     matrix: Matrix,
                     current: Coordinate,
                     neighbor: Coordinate) -> bool:
-        """Return True if neighbor is at most one level lower than current,
-        else False."""
+        """Return True if neighbor if 'valid', that is, on grid, not visited
+        yet, and not high/low relative to current."""
 
-        return neighbor_validator(matrix, current, neighbor, climbing=False)
+        if neighbor in self.visited:
+            return False
+
+        if not self._is_ongrid(matrix, neighbor):
+            return False
+
+        return height_validator(matrix, current, neighbor, climbing=False)
 
     def is_finish(self, matrix: Matrix, coordinate: Coordinate) -> bool:
         """Return True if matrix content at coordinate is "a"."""
 
         return matrix[coordinate.y][coordinate.x] == "a"
+
+    # noinspection PyUnusedLocal
+    def on_visit(self, matrix: Matrix, coordinate: Coordinate) -> None:
+        """Called wheneven a coordinate is visited."""
+
+        self.visited.add(coordinate)
 
 
 @dataclass
@@ -140,51 +182,31 @@ class Maze:
     length 1). Searching uses an instance of a MazeStrategy concrete class."""
 
     matrix: Matrix
-    visited: set[Coordinate] = field(default_factory=set)
-
-    def _is_ongrid(self, coordinate: Coordinate) -> bool:
-        """Return True if coordinate is on the grid, else False."""
-
-        return 0 <= coordinate.x < len(self.matrix[0]) \
-            and 0 <= coordinate.y < len(self.matrix)
 
     def get_neigbors(self, current: Coordinate, strategy: MazeStrategy) \
             -> list[Coordinate]:
         """Return a list of all neighbors of current coordinate that should be
-        visited as part of path finding. Each such neighbor is
-        - on the grid,
-        - not visited before,
-        - has value <= current value + 1"""
+        visited as part of path finding. Decision whether neighbor should be
+        visited is made in the strategy.neighbo_ok methdd."""
 
-        neighbors = []
-
-        for neighbor in [
-            Coordinate(current.x - 1, current.y),
-            Coordinate(current.x + 1, current.y),
-            Coordinate(current.x, current.y - 1),
-            Coordinate(current.x, current.y + 1),
-        ]:
-            if not self._is_ongrid(neighbor):
-                continue
-
-            if neighbor in self.visited:
-                continue
-
-            if not strategy.neighbor_ok(self.matrix, current, neighbor):
-                continue
-
-            neighbors.append(neighbor)
-
-        return neighbors
+        return [neighbor
+                for neighbor in [
+                    Coordinate(current.x - 1, current.y),
+                    Coordinate(current.x + 1, current.y),
+                    Coordinate(current.x, current.y - 1),
+                    Coordinate(current.x, current.y + 1),
+                ]
+                if strategy.neighbor_ok(self.matrix, current, neighbor)]
 
     def find_shortest_path(self, strategy: MazeStrategy) -> int | None:
         """Find and return the length of the shortest path in the maze from its
         start location to it finish location. Return None if there was no such
         path"""
 
-        self.visited = {strategy.start_pos}
+        start_pos = strategy.start_pos
+        strategy.on_visit(self.matrix, start_pos)
         paths_queue: Queue[tuple[Coordinate, int]] = Queue()
-        paths_queue.put((strategy.start_pos, 0))
+        paths_queue.put((start_pos, 0))
 
         while paths_queue.qsize():
             current_coordinate, current_steps = \
@@ -194,7 +216,7 @@ class Maze:
                 if strategy.is_finish(self.matrix, neighbor):
                     return current_steps + 1
 
-                self.visited.add(neighbor)
+                strategy.on_visit(self.matrix, neighbor)
                 paths_queue.put((neighbor, current_steps + 1))
 
         return None
@@ -225,8 +247,13 @@ def main():
     start_pos = maze.matrix.replace("S", "a")
     finish_pos = maze.matrix.replace("E", "z")
 
-    solution_1 = maze.find_shortest_path(AToZStrategy(start_pos, finish_pos))
-    solution_2 = maze.find_shortest_path(ZToAStrategy(finish_pos))
+    solution_1 = maze.find_shortest_path(AscendingStrategy(start_pos,
+                                                           finish_pos))
+
+    # Finding the shortest path for ANY "a" to the finish position is
+    # equivalent to finding the shortest path from the finish position to
+    # any "a".
+    solution_2 = maze.find_shortest_path(DescendingToLowestLevel(finish_pos))
 
     stop = time.perf_counter_ns()
 

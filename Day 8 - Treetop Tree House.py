@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass, field
 from math import prod
 
-from AoCLib import transposed
+from AoCLib.Miscellaneous import transposed
 
 
 @dataclass
