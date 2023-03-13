@@ -15,6 +15,8 @@ class Cave:
         self._queue = LifoQueue()
         self._done_1 = False
         self._done_2 = False
+        self._count = 0
+        self._count_1 = 0
         self._max_y = max(c.y for c in self._coordinates)
 
     def move_until_at_rest(self, coordinate: Coordinate):
@@ -45,15 +47,13 @@ class Cave:
                     next.x += 2
                     if next in self._coordinates:
                         # Nope, also already blocked... So we come to rest
-                        next.x -= 1
-                        next.y -= 1
+
                         # If we come to rest at (500, 0), we've reached the
                         # end of part 2. Either way, we're done finding a
                         # place to rest...
-                        if next == Coordinate(500, 0):
+                        if (next.x, next.y) == (501, 1):
                             self._done_2 = True
                         return
-
             # If we did not come to rest at next, then add it to our queue
             # and return
             self._queue.put(next)
@@ -68,6 +68,7 @@ class Cave:
 
         self._queue.put(drop_start)
         self.move_until_at_rest(drop_start)
+
         while self._queue.qsize() and not self._done_2:
 
             # If we're done with part 1, we store the count so far if we hadn't
