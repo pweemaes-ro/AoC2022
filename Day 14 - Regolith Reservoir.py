@@ -17,11 +17,11 @@ class CLifoQueue(LifoQueue):
     Notice that each alert is triggered only once and the next alert (if any)
     becomes active right after its preceding alert has been triggered."""
 
-    def __init__(self, q_alert_sizes: list[int]):
+    def __init__(self, q_alert_sizes: list[int]) -> None:
         super().__init__()
         self.q_alert_sizes = q_alert_sizes  # a list of queue sizes
         self.nr_gets = 0                    # nr of items we did get (drop)
-        self.alert_offset = 0                # offset of the next alert
+        self.alert_offset = 0               # offset of the next alert
         self.results: list[int] = []        # nr of gets (one per alert)
 
     def _alert_check(self) -> bool:
@@ -47,7 +47,7 @@ class CLifoQueue(LifoQueue):
 
         return coordinate
 
-    def put(self, coordinate: Coordinate, block=True, timeout=None):
+    def put(self, coordinate: Coordinate, block=True, timeout=None) -> None:
         """Delegates to super().put, and checks for possible alert."""
 
         super().put(coordinate, block=False)
@@ -59,22 +59,39 @@ class Cave:
     """A cave is a collection of occupied coordinates and functionality to
     drop sand."""
 
-    def __init__(self, file_name: str):
+    def __init__(self, file_name: str) -> None:
         self._coordinates: set[Coordinate] = set()
         self._read_coordinates(file_name)
         self._max_y = max(c.y for c in self._coordinates) + 2
         self._queue = CLifoQueue([self._max_y - 1, 0])
+        self.rocks = set(self._coordinates)
+        self.print_cave()
 
-    def move_until_at_rest(self, coordinate: Coordinate) -> None:
-        """Move from coordinate according to the move algorithm:
+    def print_cave(self) -> None:
+        min_x = min(c.x for c in self._coordinates)
+        max_x = max(c.x for c in self._coordinates)
+        s = ""
+        for y in range(self._max_y + 1):
+            for x in range(min_x, max_x + 1):
+                if (c:=Coordinate(x=x, y=y)) in self.rocks:
+                    s += "#"
+                elif c in self._coordinates:
+                    s += "o"
+                else:
+                    s += "."
+            s += "\n"
+        print(s)
+
+    def move_until_at_rest(self, start: Coordinate) -> None:
+        """Move from start according to the move algorithm:
         1. If you can go down, go down,
         2. Else if yuu can go left+down, go left+down,
         3. Else if you can go right+down, go right+down.
-        IF a move could be made, add the coordinate you moved to to the queue.
-        Repeat from 1 until no more moves possible (coordinate is where the
+        IF a move could be made, add the start you moved to to the queue.
+        Repeat from 1 until no more moves possible (start is where the
         drop of sand comes to rest)."""
 
-        candidate = Coordinate(coordinate.x, coordinate.y)
+        candidate = Coordinate(start.x, start.y)
 
         while True:
             candidate = Coordinate(candidate.x, candidate.y)
@@ -110,17 +127,17 @@ class Cave:
             candidate.y -= 1
             # The start coordinate did not have any moves left. Remove it from
             # the queue, it is a finished drop.
-            if candidate == coordinate:
+            if candidate == start:
                 _ = self._queue.get()
             # Add the candidate to the blocked coordinates.
             self._coordinates.add(candidate)
             return
 
-    def do_the_drops(self, drop_start: Coordinate) -> tuple[int, ...]:
-        """Drops sand from the drop_start coordinate untill there is no more
+    def drop_sand(self, start: Coordinate) -> tuple[int, ...]:
+        """Drops sand from the start coordinate untill there is no more
         to drop (the source of the sand gets blocked)."""
 
-        self._queue.put(drop_start)
+        self._queue.put(start)
 
         while self._queue.qsize():
             start = self._queue.queue[-1]
@@ -142,21 +159,12 @@ class Cave:
         for y in range(start, stop):
             self._coordinates.add(Coordinate(x=first.x, y=y))
 
-    def _get_coordinates(self, first: Coordinate, last: Coordinate) \
-            -> set[Coordinate]:
+    def _add_intermediatea(self, first: Coordinate, last: Coordinate) -> None:
 
-        coordinates: set[Coordinate] = set()
         if first.x != last.x:
             self._add_intermediate_x(first, last)
         else:
             self._add_intermediate_y(first, last)
-
-        return coordinates
-
-    def _get_and_join_coordinates(self, first: Coordinate, last: Coordinate) \
-            -> None:
-        new_coordinates = self._get_coordinates(first, last)
-        self._coordinates = self._coordinates.union(new_coordinates)
 
     def _get_pairs_coordinates(self, xy_pairs: str, first: Coordinate | None) \
             -> Coordinate | None:
@@ -167,7 +175,7 @@ class Cave:
                 first = Coordinate(x, y)
             else:
                 last = Coordinate(x, y)
-                self._get_and_join_coordinates(first, last)
+                self._add_intermediatea(first, last)
                 first = last
 
         return first
@@ -200,10 +208,11 @@ def main() -> None:
 
     start = time.perf_counter_ns()
 
-    solution_1, solution_2 = cave.do_the_drops(Coordinate(500, 0))
+    solution_1, solution_2 = cave.drop_sand(Coordinate(500, 0))
 
     stop = time.perf_counter_ns()
 
+    # cave.print_cave()
     assert solution_1 == 737
     print(f"Day 14 part 1: {part_1} {solution_1}")
 
