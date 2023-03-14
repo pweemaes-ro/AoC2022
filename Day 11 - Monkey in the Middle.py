@@ -11,6 +11,7 @@ from queue import Queue
 from typing import IO
 from collections.abc import Callable
 
+
 @dataclass
 class Item:
     """An item."""
