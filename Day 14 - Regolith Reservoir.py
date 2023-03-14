@@ -64,23 +64,6 @@ class Cave:
         self._read_coordinates(file_name)
         self._max_y = max(c.y for c in self._coordinates) + 2
         self._queue = CLifoQueue([self._max_y - 1, 0])
-        self.rocks = set(self._coordinates)
-        self.print_cave()
-
-    def print_cave(self) -> None:
-        min_x = min(c.x for c in self._coordinates)
-        max_x = max(c.x for c in self._coordinates)
-        s = ""
-        for y in range(self._max_y + 1):
-            for x in range(min_x, max_x + 1):
-                if (c:=Coordinate(x=x, y=y)) in self.rocks:
-                    s += "#"
-                elif c in self._coordinates:
-                    s += "o"
-                else:
-                    s += "."
-            s += "\n"
-        print(s)
 
     def move_until_at_rest(self, start: Coordinate) -> None:
         """Move from start according to the move algorithm:
@@ -212,7 +195,6 @@ def main() -> None:
 
     stop = time.perf_counter_ns()
 
-    # cave.print_cave()
     assert solution_1 == 737
     print(f"Day 14 part 1: {part_1} {solution_1}")
 
