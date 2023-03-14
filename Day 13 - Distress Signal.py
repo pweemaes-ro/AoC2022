@@ -84,8 +84,8 @@ def main(sorter_strategy: SorterStrategy = MergeSort()) -> None:
 
     solution_1 = 0
 
-    firsts: list[Packet] = list()
-    seconds: list[Packet] = list()
+    firsts: list[Packet] = []
+    seconds: list[Packet] = []
     for i, (left, right) in enumerate(pairs_of_packets, start=1):
         if left < right:
             firsts.append(left)
@@ -118,7 +118,7 @@ def main(sorter_strategy: SorterStrategy = MergeSort()) -> None:
 
 if __name__ == "__main__":
 
-    # Main takesa sorting strategy as optional parameter with default
+    # Main takes sorting strategy as optional parameter with default
     # MergeSort(). The following strategies were tested: BubbleSort,
     # InsertionSort, QuickSort and MergeSort. BubbleSort was worst.
     # InsertionSort is approx. 3 times faster than BubbleSort. QuickSort and

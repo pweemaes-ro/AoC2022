@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from queue import Queue
 
+from AoCLib.Miscellaneous import Coordinate
+
 
 class MazeStrategy(ABC):
     """Abstract class for strategy to be used when searching for shortest
@@ -138,18 +140,6 @@ class DescendingToLowestLevel(MazeStrategy):
         """Called wheneven a coordinate is visited."""
 
         self.visited.add(coordinate)
-
-
-@dataclass
-class Coordinate:
-    """A simple coordinate class that is hashable (so we can store coordinates
-    in a set)."""
-
-    x: int
-    y: int
-
-    def __hash__(self):
-        return hash(repr(self))
 
 
 class Matrix(list):

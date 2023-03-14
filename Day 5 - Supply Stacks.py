@@ -1,7 +1,6 @@
 """Day 5: Supply Stacks"""
 import time
 from copy import deepcopy
-from typing import IO
 
 from AoCLib.Miscellaneous import transposed
 
@@ -36,16 +35,13 @@ def _remove_blanks(stack: list[str]) -> list[str]:
         return stack
 
 
-def create_stacks(nr_lines: int, file: IO, nr_stacks: int) \
+def create_stacks(lines: list[str], nr_stacks: int) \
         -> MultiStacks:
     """Return a tuple of identical but independent stacks, created from the
     data in the file"""
 
-    # stack_line example: "    [G]         [P]         [M]\n"
-    # label_line example: [" ", "G", " ", " ", "P", " ", " ", "M", " "]
-    stack_lines = [file.readline() for _ in range(nr_lines)]
     label_lines = [_line_to_labels(stack_line)
-                   for stack_line in stack_lines]
+                   for stack_line in lines]
     stacks = transposed(label_lines)
     for stack in stacks:
         stack.reverse()
@@ -61,11 +57,11 @@ def _create_move_info(move_line: str) -> MoveInfo:
     return int(parts[1]), int(parts[3]) - 1, int(parts[5]) - 1
 
 
-def create_move_infos(file: IO) -> MoveInfos:
+def create_move_infos(lines: list[str]) -> MoveInfos:
     """Return a list of MoveInfos created from data in the file."""
 
     return tuple(_create_move_info(move_line)
-                 for move_line in file.readlines())
+                 for move_line in lines)
 
 
 def _remove_from_stacks(all_stacks: MultiStacks,
@@ -97,7 +93,6 @@ def do_moves(all_stacks: MultiStacks, all_moves: MoveInfos):
         _do_move(all_stacks, *move)
 
 
-# def do_move(all_stacks: MultiStacks, move_info: MoveInfo):
 def _do_move(all_stacks: MultiStacks,
              nr_to_move: int,
              from_stack_idx: int,
@@ -108,12 +103,6 @@ def _do_move(all_stacks: MultiStacks,
     removed_lists = _remove_from_stacks(all_stacks, nr_to_move, from_stack_idx)
     removed_lists[1].reverse()  # For Part 2 order must be reversed.
     _add_to_stacks(all_stacks, to_stack_idx, removed_lists)
-
-
-def read_ignore_lines(file: IO, nr_lines: int) -> None:
-    """Reads and ignores nr_lines from file."""
-    for _ in range(nr_lines):
-        file.readline()
 
 
 def main():
@@ -127,9 +116,9 @@ def main():
 
     with open("input_files/day5.txt") as input_file:
         # Create (initially identical) stacks, one for each part.
-        all_stacks = create_stacks(nr_lines=8, file=input_file, nr_stacks=2)
-        read_ignore_lines(file=input_file, nr_lines=2)
-        all_moves = create_move_infos(file=input_file)
+        lines = input_file.readlines()
+        all_stacks = create_stacks(lines[:8], nr_stacks=2)
+        all_moves = create_move_infos(lines[10:])
 
     do_moves(all_stacks, all_moves)
     solution_1 = "".join(stack[-1] for stack in all_stacks[0])

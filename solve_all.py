@@ -18,8 +18,6 @@ def aoc_modules(pattern: str = "Day *.py") -> list[ModuleType]:
     return sorted([import_module(script_file[:-3])
                    for script_file in glob.iglob(pattern)],
                   key=lambda m: int(m.__name__[4:6]))
-    # return [import_module(script_file[:-3])
-    #                for script_file in glob.iglob(pattern)]
 
 
 def solve_all():

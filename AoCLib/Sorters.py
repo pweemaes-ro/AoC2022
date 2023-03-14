@@ -42,7 +42,7 @@ class InsertionSort(SorterStrategy):
 
 
 class BubbleSort(SorterStrategy):
-    """Insertion Sort implementation."""
+    """Bubble Sort implementation."""
 
     def __call__(self, data: list[T]) -> None:
         """Slightly modified bubble sort. "Swap if the element found is greater
@@ -67,7 +67,7 @@ class BubbleSort(SorterStrategy):
 
 
 class MergeSort(SorterStrategy):
-    """Insertion Sort implementation."""
+    """Merge Sort implementation."""
 
     def __call__(self, data: list[T]) -> None:
         if len(data) > 1:
@@ -112,7 +112,7 @@ class MergeSort(SorterStrategy):
 
 
 class QuickSort(SorterStrategy):
-    """Insertion Sort implementation."""
+    """Quick Sort implementation."""
 
     def __call__(self, data: list[T]) -> None:
         self._quick_sort(data, 0, len(data) - 1)

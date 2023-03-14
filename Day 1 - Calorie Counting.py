@@ -1,7 +1,8 @@
 """Day 1: Calorie Counting"""
 import time
 from heapq import nlargest
-from typing import IO, Generator
+from typing import IO
+from collections.abc import Generator
 
 
 def get_elf_calories(input_file: IO) -> Generator[int, None, int]:

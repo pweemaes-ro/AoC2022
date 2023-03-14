@@ -2,7 +2,8 @@
 from __future__ import annotations
 import time
 from abc import ABC, abstractmethod
-from typing import IO, Callable, Any, Final
+from typing import IO, Any, Final
+from collections.abc import Callable
 
 Registers = list[int]
 Params = list[Any]

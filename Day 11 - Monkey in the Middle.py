@@ -8,8 +8,8 @@ from heapq import nlargest
 from io import StringIO
 from math import prod, floor
 from queue import Queue
-from typing import Callable, IO
-
+from typing import IO
+from collections.abc import Callable
 
 @dataclass
 class Item:
@@ -229,7 +229,7 @@ def _read_monkey(data_file: IO) -> Monkey | None:
 def read_monkeys(data_file: IO) -> list[Monkey]:
     """Create and return a list of Monkeys from data in data_file."""
 
-    monkeys: list[Monkey] = list()
+    monkeys: list[Monkey] = []
 
     while monkey := _read_monkey(data_file):
         monkeys.append(monkey)
