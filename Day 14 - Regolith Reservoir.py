@@ -4,7 +4,7 @@ import time
 from itertools import pairwise
 from queue import LifoQueue
 
-from AoCLib.Miscellaneous import Coordinate
+Coordinate = tuple[int, int]
 
 
 class Cave:
@@ -14,7 +14,8 @@ class Cave:
     def __init__(self, file_name: str) -> None:
         self._rock_coordinates: set[Coordinate] = set()
         self._get_rock_coordinates(file_name)
-        self._max_y = max(c.y for c in self._rock_coordinates) + 2
+        # self._max_y = max(c.y for c in self._rock_coordinates) + 2
+        self._max_y = max(c[1] for c in self._rock_coordinates) + 2
         self._queue: LifoQueue = LifoQueue()
         self._solution_1: int = 0
         self._nr_drops = 0
@@ -30,20 +31,20 @@ class Cave:
         scan), then the location is a rest location."""
 
         # NOTICE that candidate starts at location one DOWN from stort!
-        candidate = Coordinate(start.x, start.y + 1)
+        candidate = (start[0], start[1] + 1)
 
-        if candidate.y == self._max_y:
+        if candidate[1] == self._max_y:
             # At the bottom of the scan! Set solution 1 only if not set yet!
             self._solution_1 = self._solution_1 or self._nr_drops
-            candidate.y -= 1    # one back up to where we came from
+            candidate = (candidate[0], candidate[1] - 1)    # one back up
         else:
             for delta_x in (0, -1, 2):
-                candidate.x += delta_x
+                candidate = (candidate[0] + delta_x, candidate[1])
                 if candidate not in self._rock_coordinates:
                     self._queue.put(candidate)
                     self.drop_until_blocked(candidate)
-            candidate.x -= 1    # one back to the left,
-            candidate.y -= 1    # and one back up, to where we came from
+            # one back up and one back to the left
+            candidate = (candidate[0] - 1, candidate[1] - 1)
 
         self._rock_coordinates.add(candidate)
         _ = self._queue.get()
@@ -67,7 +68,7 @@ class Cave:
 
         for x in range(min(x_coordinates), max(x_coordinates) + 1):
             for y in range(min(y_coordinates), max(y_coordinates) + 1):
-                self._rock_coordinates.add(Coordinate(x=x, y=y))
+                self._rock_coordinates.add((x, y))
 
     def _process_coordinate_line(self, line: str) -> None:
         """Process all information xy pairs (xxx,yyy) on the line."""
@@ -110,7 +111,7 @@ def main() -> None:
 
     cave = Cave("input_files/day14.txt")
 
-    solution_1, solution_2 = cave.drop_sand(Coordinate(500, 0))
+    solution_1, solution_2 = cave.drop_sand((500, 0))
 
     stop = time.perf_counter_ns()
 
