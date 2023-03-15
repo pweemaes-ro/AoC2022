@@ -15,7 +15,6 @@ class Cave:
         self._rock_coordinates: set[Coordinate] = set()
         self._get_rock_coordinates(file_name)
         self._max_y = max(c.y for c in self._rock_coordinates) + 2
-        # self._queue = CLifoQueue()
         self._queue: LifoQueue = LifoQueue()
         self._solution_1: int = 0
         self._nr_drops = 0
@@ -36,17 +35,16 @@ class Cave:
         if candidate.y == self._max_y:
             # At the bottom of the scan! Set solution 1 only if not set yet!
             self._solution_1 = self._solution_1 or self._nr_drops
-            # Simulate we just tried (and failed) right and down.
-            candidate.x += 1
+            candidate.y -= 1    # one back up to where we came from
         else:
             for delta_x in (0, -1, 2):
                 candidate.x += delta_x
                 if candidate not in self._rock_coordinates:
                     self._queue.put(candidate)
                     self.drop_until_blocked(candidate)
+            candidate.x -= 1    # one back to the left,
+            candidate.y -= 1    # and one back up, to where we came from
 
-        candidate.x -= 1    # one back to the left
-        candidate.y -= 1    # one back up
         self._rock_coordinates.add(candidate)
         _ = self._queue.get()
         self._nr_drops += 1
