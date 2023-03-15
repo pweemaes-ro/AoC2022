@@ -137,18 +137,18 @@ def main() -> None:
              "of the sand becomes blocked. How many units of sand come to " \
              "rest?"
 
-    cave = Cave("input_files/day14.txt")
-
     start = time.perf_counter_ns()
+
+    cave = Cave("input_files/day14.txt")
 
     solution_1, solution_2 = cave.drop_sand(Coordinate(500, 0))
 
     stop = time.perf_counter_ns()
 
-    # assert solution_1 == 737
+    assert solution_1 == 737
     print(f"Day 14 part 1: {part_1} {solution_1}")
 
-    # assert solution_2 == 28145
+    assert solution_2 == 28145
     print(f"Day 14 part 2: {part_2} {solution_2}")
 
     print(f"Day 14 took {(stop - start) * 10 ** -6:.3f} ms")
