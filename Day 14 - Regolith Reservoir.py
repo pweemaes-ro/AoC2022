@@ -7,52 +7,29 @@ from AoCLib.Miscellaneous import Coordinate
 
 
 class CLifoQueue(LifoQueue):
-    """A Lifo Queue with extra functionality. The user can specify a list of
-    queue sizes that will generate an alert the first time that size is
-    reached. The nr of get() calls on the queue is then stored in a results
-    list. This way we can solve both parts of the problem in one go:
-    - part 1 is finished when the queue reaches a length of (max y coordinate
-      + 1), that is, when sand would fall into the abyss...
-    - part 2 is finished when the queue reaches a length of zero.
-    Notice that each alert is triggered only once and the next alert (if any)
-    becomes active right after its preceding alert has been triggered."""
+    """A Lifo Queue that stores the nr of get() calls on the queue, available
+    as property nr_drops. This property is queried at approprate times:
+    - first, when sand drops in the abyss for the first time. This is the
+      answer to part 1 (when queue length == max_y + 1 for the first time), and
+    - second, when the source becomes blocked. This is the answer to part 2
+      (when queue is empty)."""
 
-    def __init__(self, q_alert_sizes: list[int]) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.q_alert_sizes = q_alert_sizes  # a list of queue sizes
-        self.nr_gets = 0                    # nr of items we did get (drop)
-        self.alert_offset = 0               # offset of the next alert
-        self.results: list[int] = []        # nr of gets (one per alert)
-
-    def _alert_check(self) -> bool:
-        """Checks if the current queue size is equal to the current size
-        alert. If so, appends nr_gets to results and activates the next
-        result by incrementing the alert_offset."""
-
-        if self.qsize() == self.q_alert_sizes[self.alert_offset]:
-            self.alert_offset += 1
-            return True
-        return False
+        self._nr_gets = 0
 
     def get(self, block=False, timeout=None) -> Coordinate:
-        """Delegates to super().get, but keeps track of nr of gets and checks
-        for possible alert."""
+        """Delegates to super().get, but keeps track of nr of gets."""
 
-        coordinate = super().get(block=block)
-
-        self.nr_gets += 1
-
-        if self._alert_check():
-            self.results.append(self.nr_gets)
-
+        coordinate = super().get(block=block, timeout=timeout)
+        self._nr_gets += 1
         return coordinate
 
-    def put(self, coordinate: Coordinate, block=True, timeout=None) -> None:
-        """Delegates to super().put, and checks for possible alert."""
+    @property
+    def nr_drops(self) -> int:
+        """Return the current nr of times that the queue's get() was called."""
 
-        super().put(coordinate, block=False)
-        if self._alert_check():
-            self.results.append(self.nr_gets)
+        return self._nr_gets
 
 
 class Cave:
@@ -60,121 +37,115 @@ class Cave:
     drop sand."""
 
     def __init__(self, file_name: str) -> None:
-        self._coordinates: set[Coordinate] = set()
-        self._read_coordinates(file_name)
-        self._max_y = max(c.y for c in self._coordinates) + 2
-        self._queue = CLifoQueue([self._max_y - 1, 0])
+        self._rock_coordinates: set[Coordinate] = set()
+        self._get_rock_coordinates(file_name)
+        self._max_y = max(c.y for c in self._rock_coordinates) + 2
+        self._queue = CLifoQueue()
+        self._solution_1: int = 0
 
-    def move_until_at_rest(self, start: Coordinate) -> None:
+    def drop_until_blocked(self, start: Coordinate) -> None:
         """Move from start according to the move algorithm:
-        1. If you can go down, go down,
-        2. Else if yuu can go left+down, go left+down,
-        3. Else if you can go right+down, go right+down.
-        IF a move could be made, add the start you moved to to the queue.
-        Repeat from 1 until no more moves possible (start is where the
-        drop of sand comes to rest)."""
+        1. Go one down if not blocked,
+        2. Else go one left + one down if not blocked,
+        3. Else go right + down if not blocked.
+        After each single step, the routine is called recursively with the
+        new location as start.
+        If no more steps possible (possibly because we're at the bottom of the
+        scan), then the location is a rest location."""
 
-        candidate = Coordinate(start.x, start.y)
+        # NOTICE that candidate starts at location one DOWN from stort!
+        candidate = Coordinate(start.x, start.y + 1)
 
-        while True:
-            candidate = Coordinate(candidate.x, candidate.y)
+        if candidate.y == self._max_y:
+            # At the bottom of the scan! Set solution 1 only if not set yet!
+            self._solution_1 = self._solution_1 or self._queue.nr_drops
+            # Simulate we just tried (and failed) right and down.
+            candidate.x += 1
+        else:
+            for delta_x in (0, -1, 2):
+                candidate.x += delta_x
+                if candidate not in self._rock_coordinates:
+                    self._queue.put(candidate)
+                    self.drop_until_blocked(candidate)
 
-            candidate.y += 1
-            if candidate.y >= self._max_y:
-                # At the last line, block all possible escapes! Will fall
-                # through all tests, so candidate will be considered a
-                # resting place...
-                self._coordinates.add(candidate)
-                candidate.x -= 1
-                self._coordinates.add(candidate)
-                candidate.x += 2
-                self._coordinates.add(candidate)
-                candidate.x -= 1
-
-            if candidate not in self._coordinates:
-                self._queue.put(candidate)
-                continue
-
-            candidate.x -= 1
-            if candidate not in self._coordinates:
-                self._queue.put(candidate)
-                continue
-
-            candidate.x += 2
-            if candidate not in self._coordinates:
-                self._queue.put(candidate)
-                continue
-
-            # comes to rest or was already at rest:
-            candidate.x -= 1
-            candidate.y -= 1
-            # The start coordinate did not have any moves left. Remove it from
-            # the queue, it is a finished drop.
-            if candidate == start:
-                _ = self._queue.get()
-            # Add the candidate to the blocked coordinates.
-            self._coordinates.add(candidate)
-            return
+        candidate.x -= 1    # one back to the left
+        candidate.y -= 1    # one back up
+        self._rock_coordinates.add(candidate)
+        _ = self._queue.get()
 
     def drop_sand(self, start: Coordinate) -> tuple[int, ...]:
         """Drops sand from the start coordinate untill there is no more
         to drop (the source of the sand gets blocked)."""
 
         self._queue.put(start)
+        self.drop_until_blocked(start)
+        return self._solution_1, self._queue.nr_drops
 
-        while self._queue.qsize():
-            start = self._queue.queue[-1]
-            self.move_until_at_rest(start)
+    def _add_intermediate_coordinates(self,
+                                      first: Coordinate,
+                                      last: Coordinate) -> None:
+        """Adds all coordinates from first to last (all on same row or column)
+        to the cave's coordinates."""
 
-        return tuple(self._queue.results)
+        first_x, last_x = first.x, last.x
+        if first_x > last_x:
+            first_x, last_x = last_x, first_x
 
-    def _add_intermediate_x(self, first: Coordinate, last: Coordinate) -> None:
+        first_y, last_y = first.y, last.y
+        if first_y > last_y:
+            first_y, last_y = last_y, first_y
 
-        start = min(first.x, last.x)
-        stop = max(first.x, last.x) + 1
-        for x in range(start, stop):
-            self._coordinates.add(Coordinate(x=x, y=first.y))
+        for x in range(first_x, last_x + 1):
+            for y in range(first_y, last_y + 1):
+                self._rock_coordinates.add(Coordinate(x=x, y=y))
 
-    def _add_intermediate_y(self, first: Coordinate, last: Coordinate) -> None:
-
-        start = min(first.y, last.y)
-        stop = max(first.y, last.y) + 1
-        for y in range(start, stop):
-            self._coordinates.add(Coordinate(x=first.x, y=y))
-
-    def _add_intermediatea(self, first: Coordinate, last: Coordinate) -> None:
-
-        if first.x != last.x:
-            self._add_intermediate_x(first, last)
-        else:
-            self._add_intermediate_y(first, last)
-
-    def _get_pairs_coordinates(self, xy_pairs: str, first: Coordinate | None) \
+    def _process_coordinate_pair(self, xy_pair: str,
+                                 first: Coordinate | None) \
             -> Coordinate | None:
+        """Process a pair of coordinates by adding them and all the
+        coordinates in between (intermediates) to the set of rock locations."""
+
+        last = Coordinate(*map(int, xy_pair.split(",")))
+        if first:
+            self._add_intermediate_coordinates(first, last)
+        return last
+
+    def _process_coordinate_pairs(self, xy_pairs: str,
+                                  first: Coordinate | None) \
+            -> Coordinate | None:
+        """Process two xy_pairs (together forming a horizontal of vertical
+        section of rock)."""
 
         for xy_pair in xy_pairs.split(", "):
-            x, y = map(int, xy_pair.split(","))
-            if not first:
-                first = Coordinate(x, y)
-            else:
-                last = Coordinate(x, y)
-                self._add_intermediatea(first, last)
-                first = last
-
+            first = self._process_coordinate_pair(xy_pair, first)
         return first
 
-    def _get_line_coordinates(self, line: str) -> None:
+    def _process_coordinate_line(self, line: str) -> None:
+        """Process all information xy pairs (xxx,yyy) on the line."""
 
+        # all_pairs = re.findall(r"\d+,\d+", line)
+        # print(f"Line has all_pairs: {all_pairs}")
+        # first = all_pairs[0]
+        # for xy_pairs in all_pairs[1:]:
         first: Coordinate | None = None
         for xy_pairs in re.findall(r"\d+,\d+", line):
-            first = self._get_pairs_coordinates(xy_pairs, first)
+            print(f"{xy_pairs = }")
+            first = self._process_coordinate_pairs(xy_pairs, first)
 
-    def _read_coordinates(self, file_name: str) -> None:
+    def _get_rock_coordinates(self, file_name: str) -> None:
         with open(file_name) as input_file:
             lines = input_file.readlines()
 
+        # While trying to improve performance, I discovered that there are a
+        # lot of equal lines in the input (54 out of 148). There is no point
+        # in processing equal lines more than once! However, this does not add
+        # significantly to the performance, although it prevented ca. 7.000
+        # unnecessary add operations to the set of rock coordinates.
+        lines_seen = set()
         for line in lines:
-            self._get_line_coordinates(line)
+            if line not in lines_seen:
+                lines_seen.add(line)
+                self._process_coordinate_line(line)
 
 
 def main() -> None:
@@ -187,7 +158,7 @@ def main() -> None:
              "of the sand becomes blocked. How many units of sand come to " \
              "rest?"
 
-    cave = Cave("input_files/day14.txt")
+    cave = Cave("input_files/day14t1")
 
     start = time.perf_counter_ns()
 
@@ -195,10 +166,10 @@ def main() -> None:
 
     stop = time.perf_counter_ns()
 
-    assert solution_1 == 737
+    # assert solution_1 == 737
     print(f"Day 14 part 1: {part_1} {solution_1}")
 
-    assert solution_2 == 28145
+    # assert solution_2 == 28145
     print(f"Day 14 part 2: {part_2} {solution_2}")
 
     print(f"Day 14 took {(stop - start) * 10 ** -6:.3f} ms")
