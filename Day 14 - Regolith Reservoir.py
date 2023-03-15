@@ -7,32 +7,6 @@ from queue import LifoQueue
 from AoCLib.Miscellaneous import Coordinate
 
 
-class CLifoQueue(LifoQueue):
-    """A Lifo Queue that stores the nr of get() calls on the queue, available
-    as property nr_drops. This property is queried at approprate times:
-    - first, when sand drops in the abyss for the first time. This is the
-      answer to part 1 (when queue length == max_y + 1 for the first time), and
-    - second, when the source becomes blocked. This is the answer to part 2
-      (when queue is empty)."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._nr_gets = 0
-
-    def get(self, block=False, timeout=None) -> Coordinate:
-        """Delegates to super().get, but keeps track of nr of gets."""
-
-        coordinate = super().get(block=block, timeout=timeout)
-        self._nr_gets += 1
-        return coordinate
-
-    @property
-    def nr_drops(self) -> int:
-        """Return the current nr of times that the queue's get() was called."""
-
-        return self._nr_gets
-
-
 class Cave:
     """A cave is a collection of occupied coordinates and functionality to
     drop sand."""
@@ -41,8 +15,10 @@ class Cave:
         self._rock_coordinates: set[Coordinate] = set()
         self._get_rock_coordinates(file_name)
         self._max_y = max(c.y for c in self._rock_coordinates) + 2
-        self._queue = CLifoQueue()
+        # self._queue = CLifoQueue()
+        self._queue: LifoQueue = LifoQueue()
         self._solution_1: int = 0
+        self._nr_drops = 0
 
     def drop_until_blocked(self, start: Coordinate) -> None:
         """Move from start according to the move algorithm:
@@ -59,7 +35,7 @@ class Cave:
 
         if candidate.y == self._max_y:
             # At the bottom of the scan! Set solution 1 only if not set yet!
-            self._solution_1 = self._solution_1 or self._queue.nr_drops
+            self._solution_1 = self._solution_1 or self._nr_drops
             # Simulate we just tried (and failed) right and down.
             candidate.x += 1
         else:
@@ -73,6 +49,7 @@ class Cave:
         candidate.y -= 1    # one back up
         self._rock_coordinates.add(candidate)
         _ = self._queue.get()
+        self._nr_drops += 1
 
     def drop_sand(self, start: Coordinate) -> tuple[int, ...]:
         """Drops sand from the start coordinate untill there is no more
@@ -80,7 +57,7 @@ class Cave:
 
         self._queue.put(start)
         self.drop_until_blocked(start)
-        return self._solution_1, self._queue.nr_drops
+        return self._solution_1, self._nr_drops
 
     def _add_intermediate_coordinates(self,
                                       first: tuple[int, ...],
