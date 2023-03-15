@@ -1,6 +1,7 @@
 """Day 14: Regolith Reservoir"""
 import re
 import time
+from itertools import pairwise
 from queue import LifoQueue
 
 from AoCLib.Miscellaneous import Coordinate
@@ -99,38 +100,16 @@ class Cave:
             for y in range(first_y, last_y + 1):
                 self._rock_coordinates.add(Coordinate(x=x, y=y))
 
-    def _process_coordinate_pair(self, xy_pair: str,
-                                 first: Coordinate | None) \
-            -> Coordinate | None:
-        """Process a pair of coordinates by adding them and all the
-        coordinates in between (intermediates) to the set of rock locations."""
-
-        last = Coordinate(*map(int, xy_pair.split(",")))
-        if first:
-            self._add_intermediate_coordinates(first, last)
-        return last
-
-    def _process_coordinate_pairs(self, xy_pairs: str,
-                                  first: Coordinate | None) \
-            -> Coordinate | None:
-        """Process two xy_pairs (together forming a horizontal of vertical
-        section of rock)."""
-
-        for xy_pair in xy_pairs.split(", "):
-            first = self._process_coordinate_pair(xy_pair, first)
-        return first
-
     def _process_coordinate_line(self, line: str) -> None:
         """Process all information xy pairs (xxx,yyy) on the line."""
 
-        # all_pairs = re.findall(r"\d+,\d+", line)
-        # print(f"Line has all_pairs: {all_pairs}")
-        # first = all_pairs[0]
-        # for xy_pairs in all_pairs[1:]:
-        first: Coordinate | None = None
-        for xy_pairs in re.findall(r"\d+,\d+", line):
-            print(f"{xy_pairs = }")
-            first = self._process_coordinate_pairs(xy_pairs, first)
+        coordinate_string = re.findall(r"\d+,\d+", line)
+        coordinate_ints = [[*map(int, pair.split(","))]
+                           for pair in coordinate_string]
+        coordinates = [Coordinate(x, y) for x, y in coordinate_ints]
+
+        for first, last in pairwise(coordinates):
+            self._add_intermediate_coordinates(first, last)
 
     def _get_rock_coordinates(self, file_name: str) -> None:
         with open(file_name) as input_file:
@@ -158,7 +137,7 @@ def main() -> None:
              "of the sand becomes blocked. How many units of sand come to " \
              "rest?"
 
-    cave = Cave("input_files/day14t1")
+    cave = Cave("input_files/day14.txt")
 
     start = time.perf_counter_ns()
 
