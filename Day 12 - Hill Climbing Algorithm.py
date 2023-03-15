@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from queue import Queue
 
-from AoCLib.Miscellaneous import Coordinate
+Coordinate = tuple[int, int]
 
 
 class MazeStrategy(ABC):
@@ -31,8 +31,8 @@ class MazeStrategy(ABC):
     def _is_ongrid(matrix: Matrix, coordinate: Coordinate) -> bool:
         """Return True if coordinate is on the grid, else False."""
 
-        return 0 <= coordinate.x < len(matrix[0]) \
-            and 0 <= coordinate.y < len(matrix)
+        return 0 <= coordinate[0] < len(matrix[0]) \
+            and 0 <= coordinate[1] < len(matrix)
 
     @abstractmethod
     def neighbor_ok(self,
@@ -133,7 +133,7 @@ class DescendingToLowestLevel(MazeStrategy):
     def is_finish(self, matrix: Matrix, coordinate: Coordinate) -> bool:
         """Return True if matrix content at coordinate is "a"."""
 
-        return matrix[coordinate.y][coordinate.x] == "a"
+        return matrix[coordinate[1]][coordinate[0]] == "a"
 
     # noinspection PyUnusedLocal
     def on_visit(self, matrix: Matrix, coordinate: Coordinate) -> None:
@@ -152,7 +152,7 @@ class Matrix(list):
         """Return the ordinol of the char at the given coordinate in the
         matrix."""
 
-        return ord(self[coordinate.y][coordinate.x])
+        return ord(self[coordinate[1]][coordinate[0]])
 
     def replace(self, old: str, new: str) -> Coordinate | None:
         """Find the first occurence of old in the maze's matrix, replace it
@@ -161,7 +161,7 @@ class Matrix(list):
         for y in range(len(self)):
             if (x := self[y].find(old)) != -1:
                 self[y] = self[y].replace(old, new)
-                return Coordinate(x, y)
+                return x, y
 
         return None
 
@@ -181,10 +181,10 @@ class Maze:
 
         return [neighbor
                 for neighbor in [
-                    Coordinate(current.x - 1, current.y),
-                    Coordinate(current.x + 1, current.y),
-                    Coordinate(current.x, current.y - 1),
-                    Coordinate(current.x, current.y + 1),
+                    (current[0] - 1, current[1]),
+                    (current[0] + 1, current[1]),
+                    (current[0], current[1] - 1),
+                    (current[0], current[1] + 1),
                 ]
                 if strategy.neighbor_ok(self.matrix, current, neighbor)]
 
