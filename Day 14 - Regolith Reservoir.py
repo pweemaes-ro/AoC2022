@@ -83,32 +83,25 @@ class Cave:
         return self._solution_1, self._queue.nr_drops
 
     def _add_intermediate_coordinates(self,
-                                      first: Coordinate,
-                                      last: Coordinate) -> None:
+                                      first: tuple[int, ...],
+                                      last: tuple[int, ...]) -> None:
         """Adds all coordinates from first to last (all on same row or column)
         to the cave's coordinates."""
 
-        first_x, last_x = first.x, last.x
-        if first_x > last_x:
-            first_x, last_x = last_x, first_x
+        x_coordinates, y_coordinates = zip(first, last)
 
-        first_y, last_y = first.y, last.y
-        if first_y > last_y:
-            first_y, last_y = last_y, first_y
-
-        for x in range(first_x, last_x + 1):
-            for y in range(first_y, last_y + 1):
+        for x in range(min(x_coordinates), max(x_coordinates) + 1):
+            for y in range(min(y_coordinates), max(y_coordinates) + 1):
                 self._rock_coordinates.add(Coordinate(x=x, y=y))
 
     def _process_coordinate_line(self, line: str) -> None:
         """Process all information xy pairs (xxx,yyy) on the line."""
 
-        coordinate_string = re.findall(r"\d+,\d+", line)
-        coordinate_ints = [[*map(int, pair.split(","))]
-                           for pair in coordinate_string]
-        coordinates = [Coordinate(x, y) for x, y in coordinate_ints]
+        coordinate_ints = [tuple(map(int, pair.split(",")))
+                           for pair in re.findall(r"\d+,\d+", line)]
 
-        for first, last in pairwise(coordinates):
+        for first, last in pairwise(coordinate_ints):
+            # Both first and last are (x, y) tuples.
             self._add_intermediate_coordinates(first, last)
 
     def _get_rock_coordinates(self, file_name: str) -> None:
@@ -116,11 +109,12 @@ class Cave:
             lines = input_file.readlines()
 
         # While trying to improve performance, I discovered that there are a
-        # lot of equal lines in the input (54 out of 148). There is no point
-        # in processing equal lines more than once! However, this does not add
-        # significantly to the performance, although it prevented ca. 7.000
-        # unnecessary add operations to the set of rock coordinates.
+        # lot of equal lines in the input (54 out of 148 are not unique).
+        # There is no point in processing a line more than once! However, this
+        # does not add significantly to the performance, although it prevented
+        # ca. 7.000 unnecessary add operations on the set of rock coordinates.
         lines_seen = set()
+
         for line in lines:
             if line not in lines_seen:
                 lines_seen.add(line)
