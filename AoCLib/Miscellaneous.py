@@ -37,7 +37,7 @@ class Coordinate:
     y: int
 
     def __hash__(self):
-        return hash(repr(self))
+        return hash(repr((self.x, self.y)))
 
 
 if __name__ == "__main__":
