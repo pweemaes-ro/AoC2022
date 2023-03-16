@@ -2,9 +2,8 @@
 import re
 import time
 from itertools import pairwise
-from queue import LifoQueue
 
-Coordinate = tuple[int, int]
+Coordinate = tuple[int, ...]
 
 
 class Cave:
@@ -14,9 +13,7 @@ class Cave:
     def __init__(self, file_name: str) -> None:
         self._rock_coordinates: set[Coordinate] = set()
         self._get_rock_coordinates(file_name)
-        # self._max_y = max(c.y for c in self._rock_coordinates) + 2
         self._max_y = max(c[1] for c in self._rock_coordinates) + 2
-        self._queue: LifoQueue = LifoQueue()
         self._solution_1: int = 0
         self._nr_drops = 0
 
@@ -41,26 +38,23 @@ class Cave:
             for delta_x in (0, -1, 2):
                 candidate = (candidate[0] + delta_x, candidate[1])
                 if candidate not in self._rock_coordinates:
-                    self._queue.put(candidate)
                     self.drop_until_blocked(candidate)
             # one back up and one back to the left
             candidate = (candidate[0] - 1, candidate[1] - 1)
 
         self._rock_coordinates.add(candidate)
-        _ = self._queue.get()
         self._nr_drops += 1
 
-    def drop_sand(self, start: Coordinate) -> tuple[int, ...]:
+    def drop_sand(self, start: Coordinate) -> Coordinate:
         """Drops sand from the start coordinate untill there is no more
         to drop (the source of the sand gets blocked)."""
 
-        self._queue.put(start)
         self.drop_until_blocked(start)
         return self._solution_1, self._nr_drops
 
     def _add_intermediate_coordinates(self,
-                                      first: tuple[int, ...],
-                                      last: tuple[int, ...]) -> None:
+                                      first: Coordinate,
+                                      last: Coordinate) -> None:
         """Adds all coordinates from first to last (all on same row or column)
         to the cave's coordinates."""
 
@@ -73,8 +67,9 @@ class Cave:
     def _process_coordinate_line(self, line: str) -> None:
         """Process all information xy pairs (xxx,yyy) on the line."""
 
-        coordinate_ints = [tuple(map(int, pair.split(",")))
-                           for pair in re.findall(r"\d+,\d+", line)]
+        coordinate_ints: list[Coordinate] = \
+            [tuple(map(int, pair.split(",")))
+             for pair in re.findall(r"\d+,\d+", line)]
 
         for first, last in pairwise(coordinate_ints):
             # Both first and last are (x, y) tuples.
