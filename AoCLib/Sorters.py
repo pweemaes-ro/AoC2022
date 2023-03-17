@@ -1,4 +1,7 @@
 """Sorter classes."""
+# Please note: The code in the concrete classes is NOT mine, I took it from
+# the "geeks for geeks" website.
+
 from abc import ABC, abstractmethod
 from typing import Protocol, TypeVar
 

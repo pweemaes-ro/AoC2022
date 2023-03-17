@@ -7,65 +7,65 @@ Coordinate = tuple[int, ...]
 
 
 class Cave:
-    """A cave is a collection of occupied coordinates and functionality to
-    drop sand."""
+    """A cave is a collection of blocked coordinates and functionality to drop
+    sand from a source. The blocked coordinates are either rocks (determined
+    from the data in the input file_name) or coordinates where sand came to
+    rest (determined during the dropping of sand)."""
 
     def __init__(self, file_name: str) -> None:
-        self._rock_coordinates: set[Coordinate] = set()
+        self._blocked_coordinates: set[Coordinate] = set()
         self._get_rock_coordinates(file_name)
-        self._max_y = max(c[1] for c in self._rock_coordinates) + 2
-        self._solution_1: int = 0
-        self._nr_drops = 0
+        self._max_y = max(c[1] for c in self._blocked_coordinates) + 2
+        self._solution_1: int = 0     # holds result for part 1
+        self._solution_2: int = 0          # holds result for part 2
 
-    def drop_until_blocked(self, start: Coordinate) -> None:
+    def _drop_until_blocked(self, start: Coordinate) -> None:
         """Move from start according to the move algorithm:
-        1. Go one down if not blocked,
-        2. Else go one left + one down if not blocked,
-        3. Else go right + down if not blocked.
+        0. Done if your new location is on the last row.
+        1. Else: Go one down if not blocked,
+        2. Else: Go one left + one down if not blocked,
+        3. Else: Go right + down if not blocked.
         After each single step, the routine is called recursively with the
-        new location as start.
-        If no more steps possible (possibly because we're at the bottom of the
-        scan), then the location is a rest location."""
+        new location as start."""
 
-        # NOTICE that candidate starts at location one DOWN from stort!
         candidate = (start[0], start[1] + 1)
-
         if candidate[1] == self._max_y:
-            # At the bottom of the scan! Set solution 1 only if not set yet!
-            self._solution_1 = self._solution_1 or self._nr_drops
-            candidate = (candidate[0], candidate[1] - 1)    # one back up
+            # At the bottom of the scan! Set solution 1 (only if not set yet)!
+            self._solution_1 = self._solution_1 or self._solution_2
         else:
             for delta_x in (0, -1, 2):
                 candidate = (candidate[0] + delta_x, candidate[1])
-                if candidate not in self._rock_coordinates:
-                    self.drop_until_blocked(candidate)
-            # one back up and one back to the left
-            candidate = (candidate[0] - 1, candidate[1] - 1)
+                if candidate not in self._blocked_coordinates:
+                    self._drop_until_blocked(candidate)
 
-        self._rock_coordinates.add(candidate)
-        self._nr_drops += 1
+        # Could not fall any further. Block the start location.
+        self._blocked_coordinates.add(start)
+        self._solution_2 += 1
 
-    def drop_sand(self, start: Coordinate) -> Coordinate:
-        """Drops sand from the start coordinate untill there is no more
-        to drop (the source of the sand gets blocked)."""
+    def drop_sand(self, source: Coordinate) -> tuple[int, int]:
+        """Drops sand from the source coordinate untill there is no more to
+        drop (the source of the sand gets blocked)."""
 
-        self.drop_until_blocked(start)
-        return self._solution_1, self._nr_drops
+        self._drop_until_blocked(source)
+        return self._solution_1, self._solution_2
 
     def _add_intermediate_coordinates(self,
                                       first: Coordinate,
                                       last: Coordinate) -> None:
-        """Adds all coordinates from first to last (all on same row or column)
-        to the cave's coordinates."""
+        """Adds coordinates first and last and all intermediate coordinates to
+        the cave's blocked coordinates."""
 
         x_coordinates, y_coordinates = zip(first, last)
 
         for x in range(min(x_coordinates), max(x_coordinates) + 1):
             for y in range(min(y_coordinates), max(y_coordinates) + 1):
-                self._rock_coordinates.add((x, y))
+                self._blocked_coordinates.add((x, y))
 
     def _process_coordinate_line(self, line: str) -> None:
-        """Process all information xy pairs (xxx,yyy) on the line."""
+        """Process all information xy pairs (xxx,yyy) on the line. The
+        coordinate_ints are successive (x, y) tuples. These and all the
+        coordinates between two tuples (forming a horizontal or vertical line
+        segment) are rocks and therefore blocked."""
 
         coordinate_ints: list[Coordinate] = \
             [tuple(map(int, pair.split(",")))
@@ -76,6 +76,9 @@ class Cave:
             self._add_intermediate_coordinates(first, last)
 
     def _get_rock_coordinates(self, file_name: str) -> None:
+        """Reads data from file_name and processes it to initialize the rock's
+        blocked coordinates."""
+
         with open(file_name) as input_file:
             lines = input_file.readlines()
 
@@ -83,7 +86,8 @@ class Cave:
         # lot of equal lines in the input (54 out of 148 are not unique).
         # There is no point in processing a line more than once! However, this
         # does not add significantly to the performance, although it prevented
-        # ca. 7.000 unnecessary add operations on the set of rock coordinates.
+        # ca. 7.000 unnecessary add operations on the set of blocked
+        # coordinates.
         lines_seen = set()
 
         for line in lines:

@@ -1,5 +1,4 @@
 """Reusable stuff..."""
-from dataclasses import dataclass
 from functools import reduce
 from typing import TypeVar
 from collections.abc import Sequence
@@ -26,18 +25,6 @@ def transposed(matrix: list[list[T]]) -> list[list[T]]:
         return [[]]
 
     return [[row[i] for row in matrix] for i in range(len(matrix[0]))]
-
-
-@dataclass
-class Coordinate:
-    """A simple coordinate class that is hashable (so we can store coordinates
-    in a set)."""
-
-    x: int
-    y: int
-
-    def __hash__(self):
-        return hash(repr((self.x, self.y)))
 
 
 if __name__ == "__main__":
