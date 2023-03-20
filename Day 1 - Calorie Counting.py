@@ -1,29 +1,22 @@
 """Day 1: Calorie Counting"""
 import time
 from heapq import nlargest
-from typing import IO
 from collections.abc import Generator
 
 
-def get_elf_calories(input_file: IO) -> Generator[int, None, int]:
+def get_elf_calories(filename: str) -> Generator[int, None, None]:
     """Return a generator that yields calories per elf."""
 
-    while True:
-        calories = 0
-        while (line := input_file.readline()) and line != "\n":
-            calories += int(line)
-
-        if calories:
-            yield calories
-        else:
-            return 0
-
-
-def get_all_elf_calories(filename: str) -> list[int]:
-    """Return a list of calories per elf."""
-
     with open(filename) as input_file:
-        return [*get_elf_calories(input_file)]
+        while True:
+            calories = 0
+            while (line := input_file.readline()) and line != "\n":
+                calories += int(line)
+
+            if calories:
+                yield calories
+            else:
+                break
 
 
 def main():
@@ -36,10 +29,10 @@ def main():
 
     start = time.perf_counter_ns()
 
-    top_n = nlargest(3, get_all_elf_calories("input_files/day1.txt"))
+    top_3 = nlargest(3, get_elf_calories("input_files/day1.txt"))
 
-    solution_1 = top_n[0]
-    solution_2 = sum(top_n)
+    solution_1 = top_3[0]
+    solution_2 = sum(top_3)
 
     stop = time.perf_counter_ns()
 
