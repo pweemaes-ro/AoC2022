@@ -1,60 +1,69 @@
 """Day 2: Rock Paper Scissors"""
 import time
 
-"""Each score has 2 parts: 
-a) game_score = 0 (loss), 3 (draw) and 6 (win).
-b) choice_score = 1 (rock), 2 (paper) and 3 (scissors)
-Each score has two chars, the first being what the elf chose, the second being
-what you chose. A an X are Rock, B and Y are Paper, C and Z are Scissors.
-Rules: Rock beats Scissors, Scissors beats Paper, Paper beats Rock."""
+"""The scores dict:
+1) Each key has two chars, separated by a space char. The first char is the 
+   elf's choice, the second your choice. A an X are Rock, B and Y are Paper, C 
+   and Z are Scissors.
+2) Each value is a total score, being the sum of 2 parts: 
+   a) game score: 0 (you loose), 3 (draw) or 6 (you win).
+   b) choice score: 1 (you chose Rock), 2 (you chose Paper) and 3 (you chose 
+      Scissors).
+Rules: Rock beats Scissors, Scissors beat Paper, Paper beats Rock."""
+
 scores: dict[str, int] = \
-    {"A X": 3 + 1,  # Rock A = Rock X
-     "A Y": 6 + 2,  # Paper Y beats Rock A
-     "A Z": 0 + 3,  # Rock A beats Scissors Z
-     "B X": 0 + 1,  # Paper B beats Rock X => 0
-     "B Y": 3 + 2,  # Paper B = Paper Y
-     "B Z": 6 + 3,  # Scissors Z beats Paper B
-     "C X": 6 + 1,  # Rock X beats Scissors C
-     "C Y": 0 + 2,  # Scissors C beats Paper Y
-     "C Z": 3 + 3  # Scissors C = Scissors Z
+    {"A X": 3 + 1,  # Elf's Rock A vs. your Rock X: Draw
+     "A Y": 6 + 2,  # Elf's Rock A vs. your Paper Y: You win
+     "A Z": 0 + 3,  # Elf's Rock A vs. your Scissors Z: You lose
+     "B X": 0 + 1,  # Elf's Paper B vs. your Rock X: You lose
+     "B Y": 3 + 2,  # Elf's Paper B vs. your Paper Y: Draw
+     "B Z": 6 + 3,  # Elf's Paper B vs. your Scissors Z: You win
+     "C X": 6 + 1,  # Elf's Scissors C vs. your Rock X: You win
+     "C Y": 0 + 2,  # Elf's Scissors C vs. your Paper Y: You lose
+     "C Z": 3 + 3   # Elf's Scissors C vs. your Scissors Z: Draw
      }
 
-"""Each key has two chars, separated by a space:
-- the first is the elf's choice (A = Rock, B = Paper, C = Scissors)
-- the second is an instruction for you (X = you must loose, Y = you must draw,
-  Z = you must win.
-Each value has two chars, separated by a space:
-- the first is the elf's choice (same as in the key)
-- the second us your choice such that you comply with the instruction in the 
-  key (X = Rock, Y = Paper, Z = Scissors)."""
+"""The choices dict:
+1) Each key has two chars, separated by a space char. The first char is the 
+   elf's choice, the second is the desired result: X = you must loose, Y = you 
+   must draw, Z = you must win.
+2) Each value has two chars, separated by a space:
+   - the first is the elf's choice (same as in the key)
+   - the second is your choice (X = Rock, Y = Paper, Z = Scissors) such that 
+     the desired result (as specified in the second char of the key) is 
+     realized."""
+
 choices: dict[str, str] = \
-    {"A X": "A Z",  # Must loose from Rock, so must choose Scissors Z
-     "A Y": "A X",  # Must draw with Rock A, so must choose Rock X
-     "A Z": "A Y",  # Must win from Rock A, so must choose Paper Y
-     "B X": "B X",  # Must loose from Paper B, so must choose Rock X
-     "B Y": "B Y",  # Must draw with Paper B, so must choose Paper Y
-     "B Z": "B Z",  # Must win from Paper B, so must choose Scissors Z
-     "C X": "C Y",  # Must loose from Scissors C, so must choose Peper Y
-     "C Y": "C Z",  # Must draw with Scissors C, so must choose Scissors Z
-     "C Z": "C X",  # Must win from Scissors C, so must choose Rock X
+    {"A X": "A Z",  # Must loose. Elf's Rock A vs. your Scissors Z: you loose
+     "A Y": "A X",  # Must draw. Elf's Rock A vs. your Rock X: draw
+     "A Z": "A Y",  # Must win. Elf's Rock A vs. your Paper Y: you win
+     "B X": "B X",  # Must loose. Elf's Paper B vs. your Rock X: you loose
+     "B Y": "B Y",  # Must draw. Elf's Paper B vs. your Paper Y: draw
+     "B Z": "B Z",  # Must win: Elf's Paper B vs. your Scissors Z: you win
+     "C X": "C Y",  # Must loose: Els Scissors C vs. your Peper Y: you loose
+     "C Y": "C Z",  # Must draw: Elf's Scissors C vs. your Scissors Z: draw
+     "C Z": "C X",  # Must win: Elf's Scissors C vs. your Rock X: you win.
      }
 
 
-def get_scores():
+def get_scores() -> tuple[int, int]:
     """Return scores for both parts (strategies)."""
 
     total_score_1 = total_score_2 = 0
 
-    with open("input_files/day2.txt") as file:
-        for line in file.readlines():
-            line = line[:3]
-            total_score_1 += scores[line]
-            total_score_2 += scores[choices[line]]
+    with open("input_files/day2.txt") as input_file:
+        lines = [line[:-1] for line in input_file.readlines()]
+
+    # This could be done in two comprehensions, but this is slightly slower
+    # and (perhaps) a little bit more readable.
+    for line in lines:
+        total_score_1 += scores[line]
+        total_score_2 += scores[choices[line]]
 
     return total_score_1, total_score_2
 
 
-def main():
+def main() -> None:
     """Solve the problems."""
 
     part_1 = "What would your total score be if everything goes exactly " \
@@ -65,10 +74,7 @@ def main():
 
     start = time.perf_counter_ns()
 
-    strategy_scores = get_scores()
-
-    solution_1 = strategy_scores[0]
-    solution_2 = strategy_scores[1]
+    solution_1, solution_2 = get_scores()
 
     stop = time.perf_counter_ns()
 
