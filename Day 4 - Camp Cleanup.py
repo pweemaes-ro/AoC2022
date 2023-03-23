@@ -1,34 +1,29 @@
 """Day 4: Camp Cleanup."""
+import re
 import time
+from typing import Iterable
 
 
-def is_overlap(range_pair: list[int]) -> bool:
-    """Return True if one range overlaps the other. A range is a
-    tuple(first, last) and one tuple overlaps another iif
-    - start first between start second and stop second,
-    OR
-    - start second between start first and stop first,"""
+def is_overlap(range_pair: Iterable[int]) -> bool:
+    """range_pair is assumed to be a list of 4 integers p <= q, r <= s.
+    Return True if range(p, q) and range(r, s) overlap, else returns False."""
 
-    start_first, stop_first, start_second, stop_second = range_pair
+    p, q, r, s = range_pair
 
-    return (start_second <= start_first <= stop_second) or \
-        (start_first <= start_second <= stop_first)
+    return (r <= p <= s) or (p <= r <= q)
 
 
-def is_containment(range_pair: list[int]) -> bool:
-    """Return True if one range is contained in the other. A range is a
-    tuple(first, last) and one tuple completeley overlaps another iif
-    - start first >= start second AND stop first <= stop second,
-    OR
-    - start second >= start first AND stop second <= stop first."""
+def is_containment(range_pair: Iterable[int]) -> bool:
+    """range_pair is assumed to be sa list of 4 integers p <= >q, r <= s.
+    Return True if range(p, q) contains range(r, s) or range(r, s) contains
+    range(p, q), else returns False."""
 
-    start_first, stop_first, start_second, stop_second = range_pair
+    p, q, r, s = range_pair
 
-    return (start_first >= start_second and stop_first <= stop_second) or \
-        (start_second >= start_first and stop_second <= stop_first)
+    return (p >= r and q <= s) or (r >= p and s <= q)
 
 
-def main():
+def main() -> None:
     """Solve the puzzle."""
 
     part_1 = "In how many assignment pairs does one range fully contain the " \
@@ -40,43 +35,26 @@ def main():
     with open("input_files/day4.txt") as file:
         lines = file.readlines()
 
-    # Convert n file lines, with n == 4:
-    # 1-93,2-11
-    # 26-94,26-94
-    # 72-92,48-88
-    # 36-37,37-52
-    # to a list of n lists of (always) 4 integers
-    # [[1, 93, 2, 11],
-    #  [26, 94, 26, 94],
-    #  [72, 92, 48, 88],
-    #  [36, 37, 37, 52]]
-    # We use a list-generator expression that for each line from the file:
-    # 1. removes last char "\n": line[-1]
-    # 2. replaces the "," with "-": replace(",", "-")
-    # 3. splits on "-": split("-"), and
-    # 4. converts strings from split to ints: int(s) for s in ....split("-").
-    lists_of_ints = [
-        [int(s)
-         for s in line.replace(",", "-").split("-")]
-        for line in lines]
+    tuples_of_ints = tuple(tuple(map(int, re.findall(r"\d+", line)))
+                           for line in lines)
 
     containment = overlap = 0
-    for list_of_ints in lists_of_ints:
+    for list_of_ints in tuples_of_ints:
         if is_containment(list_of_ints):
             containment += 1
         elif is_overlap(list_of_ints):
             overlap += 1
 
     solution_1 = containment
-    solution_2 = containment + overlap
+    solution_2 = containment + overlap      # containment implies overlap!
 
     stop = time.perf_counter_ns()
 
     assert solution_1 == 503
-    print(f"Day 4 part 1: {part_1} {solution_1}")
+    print(f"Day 4 part 1: {part_1} {solution_1:_}")
 
     assert solution_2 == 827
-    print(f"Day 4 part 2: {part_2} {solution_2}")
+    print(f"Day 4 part 2: {part_2} {solution_2:_}")
 
     print(f"Day 4 took {(stop - start) * 10 ** -6:.3f} ms")
 
