@@ -1,6 +1,7 @@
 """Sorter classes."""
 # Please note: The code in the concrete classes is NOT mine, I took it from
-# the "geeks for geeks" website.
+# the "geeks for geeks" website (and modified it slightly to accomodate my
+# specific needs).
 
 from abc import ABC, abstractmethod
 from typing import Protocol, TypeVar
@@ -21,14 +22,16 @@ class SorterStrategy(ABC):
     """Abstract class for sorter classes."""
 
     @abstractmethod
-    def __call__(self, data: list[T]) -> None:
+    def sort(self, data: list[T]) -> None:
+        """Sort the data in place"""
         ...
 
 
 class InsertionSort(SorterStrategy):
     """Insertion Sort implementation."""
 
-    def __call__(self, data: list[T]) -> None:
+    def sort(self, data: list[T]) -> None:
+        """Sort the data in place using Insertion Sort."""
         # Traverse through 1 to len(data)
         for i in range(1, len(data)):
 
@@ -47,11 +50,11 @@ class InsertionSort(SorterStrategy):
 class BubbleSort(SorterStrategy):
     """Bubble Sort implementation."""
 
-    def __call__(self, data: list[T]) -> None:
-        """Slightly modified bubble sort. "Swap if the element found is greater
-        than the next element" is changed to "Swap if the element found is
-        not smaller than the next element" (reason: Packet implements the '<'
-        operator, not the '>' operator."""
+    def sort(self, data: list[T]) -> None:
+        """Sort the data in place using slightly modified bubble sort. "Swap
+        if the element found is greater than the next element" is changed to
+        "Swap if the element found is not smaller than the next element"
+        (reason: Packet implements the '<' operator, not the '>' operator."""
 
         nr_of_items = len(data)
 
@@ -72,7 +75,8 @@ class BubbleSort(SorterStrategy):
 class MergeSort(SorterStrategy):
     """Merge Sort implementation."""
 
-    def __call__(self, data: list[T]) -> None:
+    def sort(self, data: list[T]) -> None:
+        """Sort the data in place using Merge Sort."""
         if len(data) > 1:
 
             # Finding the mid of the array
@@ -85,10 +89,10 @@ class MergeSort(SorterStrategy):
             right = data[mid:]
 
             # Sorting the first half
-            self(left)
+            self.sort(left)
 
             # Sorting the second half
-            self(right)
+            self.sort(right)
 
             i = j = k = 0
 
@@ -117,7 +121,8 @@ class MergeSort(SorterStrategy):
 class QuickSort(SorterStrategy):
     """Quick Sort implementation."""
 
-    def __call__(self, data: list[T]) -> None:
+    def sort(self, data: list[T]) -> None:
+        """Sort the data in place using Quicksort."""
         self._quick_sort(data, 0, len(data) - 1)
 
     def _quick_sort(self, array, low, high):
@@ -144,11 +149,9 @@ class QuickSort(SorterStrategy):
         # Traverse through all elements
         # compare each element with pivot
         for j in range(low, high):
-            # if data[j] <= pivot:
             if not pivot < data[j]:
                 # If element smaller than pivot is found
                 # swap it with the greater element pointed by i
-                # i = i + 1
                 i += 1
 
                 # Swapping element at i with element at j
