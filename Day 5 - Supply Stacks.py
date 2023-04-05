@@ -11,16 +11,17 @@ MoveInfo = tuple[int, ...]
 MoveInfos = tuple[MoveInfo, ...]
 
 
-def _line_to_labels(line):
+def _line_to_labels(line: str) -> list[str]:
     """Return a list of labels based on a line. Example:
     line "    [J]     [W] [V] [Q] [W] [F]    " is converted to list of labels:
     [" ". "J", " ", "W", "V", "Q", "W", "F", " "]. Notice that missing labels
     (anywhere) are replaced by empty strings ("")."""
 
-    nr_labels = len(line) // 4
+    nr_labels = (len(line) + 1) // 4
+    nr_extra_blanks = 9 - nr_labels
 
     labels = [line[i * 4 + 1] for i in range(nr_labels)]
-    extra_blanks = [" " for _ in range(9 - nr_labels)]
+    extra_blanks = [" " for _ in range(nr_extra_blanks)]
 
     return labels + extra_blanks
 
@@ -28,6 +29,9 @@ def _line_to_labels(line):
 def _remove_blanks(stack: list[str]) -> list[str]:
     """Removes all " " items from the stack."""
 
+    # while stack[0] == " ":
+    #     stack.pop(0)
+    # return stack
     try:
         while True:
             stack.remove(" ")
@@ -86,7 +90,7 @@ def _add_to_stacks(all_stacks: MultiStacks,
         stacks[to_stack_idx].extend(extend_list)
 
 
-def do_moves(all_stacks: MultiStacks, all_moves: MoveInfos):
+def do_moves(all_stacks: MultiStacks, all_moves: MoveInfos) -> None:
     """Execute all moves on all stacks."""
 
     for move in all_moves:
@@ -96,7 +100,7 @@ def do_moves(all_stacks: MultiStacks, all_moves: MoveInfos):
 def _do_move(all_stacks: MultiStacks,
              nr_to_move: int,
              from_stack_idx: int,
-             to_stack_idx: int):
+             to_stack_idx: int) -> None:
     """Executes (on all stacks in MultiStacks) the move of nr_to_move items
     from stack with index from_stack_idx to stack with index to_stack_idx."""
 
@@ -105,7 +109,7 @@ def _do_move(all_stacks: MultiStacks,
     _add_to_stacks(all_stacks, to_stack_idx, removed_lists)
 
 
-def main():
+def main() -> None:
     """Solve the puzzle"""
 
     part_1 = "After the rearrangement procedure completes, what crate ends " \
@@ -116,9 +120,10 @@ def main():
 
     with open("input_files/day5.txt") as input_file:
         # Create (initially identical) stacks, one for each part.
-        lines = input_file.readlines()
-        all_stacks = create_stacks(lines[:8], nr_stacks=2)
-        all_moves = create_move_infos(lines[10:])
+        lines = input_file.read().splitlines()
+
+    all_stacks = create_stacks(lines[:8], nr_stacks=2)
+    all_moves = create_move_infos(lines[10:])
 
     do_moves(all_stacks, all_moves)
     solution_1 = "".join(stack[-1] for stack in all_stacks[0])

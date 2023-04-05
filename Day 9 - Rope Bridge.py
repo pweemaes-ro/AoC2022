@@ -11,7 +11,7 @@ class Knot:
     y: int
     _locations: set[tuple[int, ...]] = field(default_factory=set)
 
-    def add_current_location(self):
+    def add_current_location(self) -> None:
         """Adds current location to set of visited locations."""
         self._locations.add((self.x, self.y))
 
@@ -118,10 +118,10 @@ def main() -> None:
     stop = time.perf_counter_ns()
 
     assert solution_1 == 6357
-    print(f"Day 9 part 1: {part_1} {solution_1}")
+    print(f"Day 9 part 1: {part_1} {solution_1:_}")
 
     assert solution_2 == 2627
-    print(f"Day 9 part 2: {part_2} {solution_2}")
+    print(f"Day 9 part 2: {part_2} {solution_2:_}")
 
     print(f"Day 9 took {(stop - start) * 10 ** -6:.3f} ms")
 

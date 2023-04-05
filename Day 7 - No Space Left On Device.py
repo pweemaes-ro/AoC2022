@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 import time
-from enum import StrEnum
-from functools import wraps
 from collections.abc import Callable
+from enum import StrEnum
 
 
 class Command(StrEnum):
@@ -36,7 +35,7 @@ class FSO:
         self._parent: FSO = self
         self._type = fso_type
         self._size = 0 if type == FSO.FsoTypes.DIR else size
-        self._children: list[FSO] = []
+        self._children: dict[str, FSO] = dict()
         self._dirty = False
 
     @property
@@ -51,7 +50,8 @@ class FSO:
 
         if self._type == FSO.FsoTypes.DIR:
             if self._dirty:
-                self._size = sum(child.fso_size for child in self._children)
+                self._size = sum(child.fso_size
+                                 for child in self._children.values())
                 self._set_dirty(False)
 
         return self._size
@@ -78,7 +78,7 @@ class FSO:
         """Add component as child to this fso. Note: No check whether child
         with same name as component already exists!"""
 
-        self._children.append(component)
+        self._children[component.name] = component
         component._parent = self
         self._set_dirty(True)
 
@@ -89,12 +89,12 @@ class FSO:
         if filter_func(self):
             fso_list.append(self)
 
-        for child in self._children:
+        for child in self._children.values():
             fso_list.extend(child.collect(filter_func))
 
         return fso_list
 
-    def _set_dirty(self, dirty: bool):
+    def _set_dirty(self, dirty: bool) -> None:
         """If dirty == True. sets this fso and all parent dirs up to the root
         directory 'dirty' to indicate that fso_sizes of these dirs must be
         recalculated when fso_size is queried. If dirty is False, the dirty
@@ -104,14 +104,10 @@ class FSO:
         if dirty and not self.is_root():
             self._parent._set_dirty(dirty)
 
-    def child(self, name: str):
+    def child(self, name: str) -> FSO:
         """Return the child of this fso with the specified name."""
 
-        for child in self._children:
-            if child._name == name:
-                return child
-
-        raise ValueError(f"Directory '{self._name}' has no child '{name}'.")
+        return self._children[name]
 
     @property
     def root(self) -> FSO:
@@ -125,20 +121,18 @@ class FSO:
 def dirs_le_size(size: int) -> Callable[[FSO], bool]:
     """Filter function. Only dirs with fso_size <= size."""
 
-    @wraps(dirs_le_size)
     def _filter_func(fso: FSO) -> bool:
-        return fso.fso_size <= size \
-            and fso.fso_type == FSO.FsoTypes.DIR
+        return fso.fso_type == FSO.FsoTypes.DIR \
+            and fso.fso_size <= size
     return _filter_func
 
 
 def dirs_ge_size(size: int) -> Callable[[FSO], bool]:
     """Filter function. Only dirs with fso_size >= size."""
 
-    @wraps(dirs_ge_size)
     def _filter_func(fso: FSO) -> bool:
-        return fso.fso_size >= size \
-            and fso.fso_type == FSO.FsoTypes.DIR
+        return fso.fso_type == FSO.FsoTypes.DIR \
+            and fso.fso_size >= size
     return _filter_func
 
 
@@ -207,10 +201,10 @@ def main() -> None:
     stop = time.perf_counter_ns()
 
     assert solution_1 == 1743217
-    print(f"Day 7 part 1: {part_1} {solution_1}")
+    print(f"Day 7 part 1: {part_1} {solution_1:_}")
 
     assert solution_2 == 8319096
-    print(f"Day 7 part 2: {part_2} {solution_2}")
+    print(f"Day 7 part 2: {part_2} {solution_2:_}")
 
     print(f"Day 7 took {(stop - start) * 10 ** -6:.3f} ms")
 

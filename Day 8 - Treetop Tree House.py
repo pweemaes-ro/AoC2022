@@ -51,10 +51,10 @@ def _process_directed_row(tree_row: TreeRow) -> None:
 
     row_length = len(tree_row)
     highest_tree_in_row = -1
-    for i, tree in enumerate(tree_row):
-        highest_tree_in_row = _set_visibility(tree, highest_tree_in_row)
 
-        other_trees = tree_row[i + 1: row_length]
+    for i, tree in enumerate(tree_row, start=1):
+        highest_tree_in_row = _set_visibility(tree, highest_tree_in_row)
+        other_trees = tree_row[i: row_length]
         score = _get_scenic_score(tree, other_trees)
         tree.scenic_scores.append(score)
 
@@ -63,7 +63,7 @@ def _process_row(matrix_row: TreeRow) -> None:
     """Process the row by delegating to _process_directed_row for original row
     AND the reversed row."""
     
-    for directed_treerow in (matrix_row, [*reversed(matrix_row)]):
+    for directed_treerow in (matrix_row, matrix_row[::-1]):
         _process_directed_row(directed_treerow)
 
 
@@ -83,7 +83,7 @@ def _update_scenic_score_products(matrix: TreeMatrix) -> None:
             tree.scenic_score = prod(tree.scenic_scores)
 
 
-def get_max_scenic_score(matrix: TreeMatrix):
+def get_max_scenic_score(matrix: TreeMatrix) -> int:
     """Return the maximum scenic score found in the matric of trees."""
 
     return max([tree.scenic_score for tree_row in matrix for tree in tree_row])
@@ -95,7 +95,7 @@ def count_visible_trees(matrix: TreeMatrix) -> int:
     return sum(tree.visible for row in matrix for tree in row)
 
 
-def set_visibility_and_scores(matrix: TreeMatrix):
+def set_visibility_and_scores(matrix: TreeMatrix) -> None:
     """Sets all relevant data members of each tree (visibility, scenic scores,
     the product of the scenic scores."""
 
@@ -112,7 +112,7 @@ def build_matrix(lines: list[str]) -> TreeMatrix:
     return [[Tree(int(s)) for s in line[:-1]] for line in lines]
 
 
-def main():
+def main() -> None:
     """Solve the puzzle."""
 
     part_1 = "Consider your map; how many trees are visible from outside " \
@@ -134,10 +134,10 @@ def main():
     stop = time.perf_counter_ns()
 
     assert solution_1 == 1543
-    print(f"Day 8 part 1: {part_1} {solution_1}")
+    print(f"Day 8 part 1: {part_1} {solution_1:_}")
 
     assert solution_2 == 595080
-    print(f"Day 8 part 2: {part_2} {solution_2}")
+    print(f"Day 8 part 2: {part_2} {solution_2:_}")
 
     print(f"Day 8 took {(stop - start) * 10 ** -6:.3f} ms")
 

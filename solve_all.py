@@ -1,7 +1,7 @@
 """Main application to solve all problems. It uses a 'plugin' approach..."""
 import glob
-from types import ModuleType
 from importlib import import_module
+from types import ModuleType
 
 
 def aoc_modules(pattern: str = "Day *.py") -> list[ModuleType]:
@@ -20,7 +20,7 @@ def aoc_modules(pattern: str = "Day *.py") -> list[ModuleType]:
                   key=lambda m: int(m.__name__[4:6]))
 
 
-def solve_all():
+def solve_all() -> None:
     """Solve all available puzzles by calling main on all available (and
     imported) modules."""
 

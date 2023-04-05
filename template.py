@@ -18,10 +18,10 @@ def main() -> None:
     stop = time.perf_counter_ns()
 
     assert solution_1 == 0
-    print(f"Day ... part 1: {part_1} {solution_1}")
+    print(f"Day ... part 1: {part_1} {solution_1:_}")
 
     assert solution_2 == 0
-    print(f"Day ... part 2: {part_2} {solution_2}")
+    print(f"Day ... part 2: {part_2} {solution_2:_}")
 
     print(f"Day ... took {(stop - start) * 10 ** -6:.3f} ms")
 

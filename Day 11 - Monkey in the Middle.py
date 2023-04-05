@@ -1,21 +1,18 @@
 """Day 11: Monkey in the Middle."""
 from __future__ import annotations
-import operator
+
+import re
 import time
+from copy import deepcopy
 from dataclasses import dataclass, field
-from functools import wraps
 from heapq import nlargest
-from io import StringIO
 from math import prod, floor
-from queue import Queue
-from typing import IO
-from collections.abc import Callable
+from typing import IO, Callable
 
 
 @dataclass
 class Item:
     """An item."""
-
     # The worry level is set when reading the data. In part 1 the worry-level
     # is recalculated and updated whenever the item is inspected, and the test
     # is performed on the actual worry level. This works for part 1 since
@@ -26,22 +23,17 @@ class Item:
     # this is for now the best I can do...
     worry_level: int
 
-    # current_modulos is used in part 2 only. It has as keys the primes from 2
+    # modulos is used in part 2 only. It has as keys the primes from 2
     # to 19, and for each key it has 0 <= value < key, being the item's
-    # starting value modulo that prime. Each time a monkey processes an item,
-    # a 'virtual' operation is performed ('virtual', since in part 2 we don't
+    # starting value modulo that prime. Each time a monkey inspects an item, a
+    # 'virtual' operation is performed ('virtual', since in part 2 we don't
     # calculate the (huge) new worry level, but only the new worry level's
-    # prime modulo's.). The following simple theorems allow for that:
+    # prime modulo's). The following simple theorems allow for that:
     #   if n % p = a then (n * x) % p = (a * (n % p)) % p
     #   if n % p = a then (n + x) % p = (a + (n % p)) % p
-    current_modulos: dict[int, int] = field(default_factory=dict)  # part 2
-
-    def set_initial_modulos(self) -> None:
-        """Initializes the modulos for the current value (supposedly the
-        starting value)."""
-
-        self.current_modulos = {p: self.worry_level % p
-                                for p in (2, 3, 5, 7, 11, 13, 17, 19, 23)}
+    modulos: dict[int, int] = field(init=False,
+                                    repr=False,
+                                    compare=False)  # part 2
 
 
 Operation = Callable[[int, int], int]
@@ -52,50 +44,54 @@ class Monkey:
     """Represents a monkey, holding items etc."""
 
     monkey_id: int
-    items: Queue[Item] = field()
+    items: list[Item]
     operation: Operation
     test_divisor: int       # divisibility by this nr determines destination
     on_success: int         # destination if divisible by test_divisor
     on_fail: int            # destination if NOT divisible by test_divisor
     inspection_count: int = 0   # How many items did this monkey inspect?
 
-    def get_item_destination(self, item: Item) -> int:
-        """Return the destination for the item using part 2 calculations."""
+    def set_modulos(self, test_divisors: set[int]) -> None:
+        """Set modulos for all items that this monkey is currently
+        holding"""
+        for item in self.items:
+            item.modulos = {test_divisor: item.worry_level % test_divisor
+                            for test_divisor in test_divisors}
 
-        # TODO: The name of this method is misleading, since it does more than
-        #       just returning the destination. It also UPDATES the modulos.
 
-        for prime, current_modulo in item.current_modulos.items():
-            item.current_modulos[prime] = self.operation(prime, current_modulo)
+InspectionFunc = Callable[[Monkey, Item], int]
 
-        divisible = item.current_modulos[self.test_divisor] == 0
-        return self.on_success if divisible else self.on_fail
 
-    def get_item_destination_part_1(self, item: Item) -> int:
-        """Return the destination for the item using part 1 calculations."""
+def inspection_part_1(monkey: Monkey, item: Item) -> int:
+    """Inspects the item, resulting in a destination (monkey id) that the item
+    is thrown to."""
 
-        # TODO: The name of this method is misleading, since it does more than
-        #       just returning the destination. It also DETERMINES the
-        #       destination after MODIFYING the worry level.
+    item.worry_level = floor(monkey.operation(0, item.worry_level) / 3)
 
-        item.worry_level = self.operation(0, item.worry_level)
-        item.worry_level = floor(item.worry_level / 3)
+    divisible = item.worry_level % monkey.test_divisor == 0
+    return monkey.on_success if divisible else monkey.on_fail
 
-        divisible = (item.worry_level % self.test_divisor) == 0
 
-        return self.on_success if divisible else self.on_fail
+def inspection_part_2(monkey: Monkey, item: Item) -> int:
+    """Inspects the item, resulting in a destination (monkey id) that the item
+    is thrown to."""
+
+    for prime, current_modulo in item.modulos.items():
+        item.modulos[prime] = monkey.operation(prime, current_modulo)
+
+    divisible = item.modulos[monkey.test_divisor] == 0
+    return monkey.on_success if divisible else monkey.on_fail
 
 
 def _operation_add(term: int) -> Operation:
     """Return a function that takes n and prime as params, and returns
     a) if not prime: n is interpreted as a number and the function returns the
        sum (n + term) (in solving part 1),
-    b) else: n is interpreted as the current value of worry level mod prime
-       and the functon returns (n + term) modulo prime, being the value of
-       worry level modulo prime had we done the actual addition on worry level
-       (in solving part 2)."""
+    b) else: n is interpreted as the current value of (worry level mod prime)
+       and the functon returns ((n + term) modulo prime), being the value of
+       (worry level modulo prime) had we done the actual addition on worry
+       level (in solving part 2)."""
 
-    @wraps(_operation_add)
     def _inner(prime: int, n: int) -> int:
         result = n + term
         if prime:
@@ -106,15 +102,14 @@ def _operation_add(term: int) -> Operation:
 
 
 def _operation_mul_by(factor: int) -> Operation:
-    """Return a function that takes prime and n as params, and returns
+    """Return a function that takes prime and n as params.
     a) if not prime: n is interpreted as a number and the function returns the
-       product (n * term) (in solving part 1),
-    b) else: n is interpreted as the current value of worry level mod prime
-       and the functon returns (n * term) modulo prime, being the value of
-       worry level modulo prime had we done the actual multiplication on worry
-       level (in solving part 2)."""
+       product (n * factor) (in solving part 1),
+    b) else: n is interpreted as the current value of (worry level mod prime)
+       and the functon returns ((n * term) modulo prime), being the value of
+       (worry level modulo prime) had we done the actual multiplication on
+       worry level (in solving part 2)."""
 
-    @wraps(_operation_mul_by)
     def _inner(prime: int, n: int) -> int:
         result = n * factor
         if prime:
@@ -147,26 +142,15 @@ def _line_to_id(line: str) -> int:
     if not line:
         return -1
 
-    return int(line.split()[-1][:-1])
+    return int(re.findall(r"\d+", line)[0])
 
 
-def _line_to_starting_values(line: str) -> Queue[Item]:
-    """Reaa starting values from line, convert to ints and put it in a Queue.
-    Return the queue."""
+def _line_to_starting_values(line: str) -> list[Item]:
+    """Read starting values from line, convert to ints and put it in a list.
+    Return the list."""
 
-    #     """Convert line to list of ints. Example:
-    #     '  Starting items: 73, 77\n' -> [73, 77]
-    start_values = [int(i) for i in line.split(":")[-1].split(",")]
-
-    # put the ints in a queue of Item objects, and for each item also set the
-    # initial modulo's for all primes from 2 to 19.
-    items_queue: Queue[Item] = Queue()
-    for initial_worry_level in start_values:
-        item = Item(worry_level=initial_worry_level)
-        item.set_initial_modulos()
-        items_queue.put(item)
-
-    return items_queue
+    return [Item(int(start_value))
+            for start_value in re.findall(r"\d+", line)]
 
 
 def _line_to_operation(line: str) -> Operation:
@@ -185,15 +169,14 @@ def _line_to_operation(line: str) -> Operation:
         else:               # new = old * n     (n = int(var))
             return _operation_mul_by(int(var))
     else:
-        raise ValueError(f"Unexpected operator '{operator}'")
+        raise ValueError(f"Unexpected operator '{_operator}'")
 
 
 def _line_to_test_divisor(line: str) -> int:
     """Convert line to test lambda. Example:
       'Test: divisible by 11\n' -> lambda: x: x % 11 == 0"""
 
-    # *_, param = line.split()
-    return int(line.split()[-1])
+    return int(re.findall(r"\d+", line)[0])
 
 
 def _line_to_destination(line: str) -> int:
@@ -201,79 +184,97 @@ def _line_to_destination(line: str) -> int:
     '    If true: throw to monkey 6\n' -> 6
     '    If false: throw to monkey 3\n' -> 3"""
 
-    return int(line.split()[-1])
+    return int(re.findall(r"\d+", line)[0])
 
 
-def _read_monkey(data_file: IO) -> Monkey | None:
-    """Read and return a single Monkey from data file. Return None if no more
-    monkeys to read."""
+def _read_monkey(data_file: IO) -> tuple[Monkey, Monkey] | None:
+    """Read and return two identical Monkeys. Return None if no more monkeys
+    to read."""
 
     monkey_id = _line_to_id(data_file.readline())
     if monkey_id == -1:     # EOF, no more monkeys
         return None
 
-    items_queue = _line_to_starting_values(data_file.readline())
+    items = _line_to_starting_values(data_file.readline())
     operation = _line_to_operation(data_file.readline())
     test_divisor = _line_to_test_divisor(data_file.readline())
-    succes_destination = _line_to_destination(data_file.readline())
-    fail_destination = _line_to_destination(data_file.readline())
+    on_success = _line_to_destination(data_file.readline())
+    on_fail = _line_to_destination(data_file.readline())
     _ = data_file.readline()
 
-    return Monkey(monkey_id,
-                  items_queue,
-                  operation,
-                  test_divisor,
-                  succes_destination,
-                  fail_destination)
+    monkey_1 = Monkey(monkey_id,
+                      items,
+                      operation,
+                      test_divisor,
+                      on_success,
+                      on_fail)
+    monkey_2 = Monkey(monkey_id,
+                      deepcopy(items),  # NEED deepcopy only here!
+                      operation,
+                      test_divisor,
+                      on_success,
+                      on_fail)
+
+    return monkey_1, monkey_2
 
 
-def read_monkeys(data_file: IO) -> list[Monkey]:
-    """Create and return a list of Monkeys from data in data_file."""
+def read_monkeys(data_file: IO) -> tuple[list[Monkey], list[Monkey]]:
+    """Create and return two lists of Monkeys from data in data_file."""
 
-    monkeys: list[Monkey] = []
+    monkey_lists: tuple[list[Monkey], list[Monkey]] = ([], [])
 
-    while monkey := _read_monkey(data_file):
-        monkeys.append(monkey)
+    while monkeys := _read_monkey(data_file):
+        monkey_lists[0].append(monkeys[0])
+        monkey_lists[1].append(monkeys[1])
 
-    return monkeys
+    return monkey_lists
 
 
 def _play_monkey(monkey: Monkey,
                  monkeys: list[Monkey],
-                 part_1: bool) -> None:
+                 inspector: InspectionFunc) -> None:
     """Process all items for give Monkey."""
 
-    while monkey.items.qsize():
-        monkey.inspection_count += 1
-        item = monkey.items.get()
+    monkey.inspection_count += len(monkey.items)
 
-        if part_1:
-            destination = monkey.get_item_destination_part_1(item)
-        else:
-            destination = monkey.get_item_destination(item)
-
-        monkeys[destination].items.put(item)
+    while monkey.items:
+        # Get next item, inspect it and move it to whatever monkey the
+        # inspection function tells us to move it to.
+        item = monkey.items.pop(-1)
+        monkeys[inspector(monkey, item)].items.append(item)
 
 
-def _play_round(monkeys: list[Monkey], part_1: bool) -> None:
+def _play_round(monkeys: list[Monkey], inspector: InspectionFunc) -> None:
     """Play one round, that is, let all monkeys (in order) process the items
     they're holding (in order)."""
 
     for monkey in monkeys:
-        _play_monkey(monkey, monkeys, part_1)
+        _play_monkey(monkey, monkeys, inspector)
 
 
 def do_monkey_business(monkeys: list[Monkey],
                        rounds: int,
-                       part_1: bool = False) -> int:
+                       inspector: InspectionFunc) -> int:
     """Process all rounds for all monkeys and return the 'level of monkey
     business' (the product of the top 2 most items inspected amonst all
     monkeys)."""
 
-    for current_round in range(rounds):
-        _play_round(monkeys, part_1)
+    for _ in range(rounds):
+        _play_round(monkeys, inspector)
 
     return prod(nlargest(2, (m.inspection_count for m in monkeys)))
+
+
+def set_initial_modulos(monkeys: list[Monkey]) -> None:
+    """Sets the initial modulos for all items for all monkeys. The initial
+    modulo is calculated for each test divisor for each item, using the
+    current (initial) worry_level. The test divisors are read from the monkey
+    data structs."""
+
+    test_divisors = set(monkey.test_divisor for monkey in monkeys)
+
+    for monkey in monkeys:
+        monkey.set_modulos(test_divisors)
 
 
 def main() -> None:
@@ -287,13 +288,23 @@ def main() -> None:
     start = time.perf_counter_ns()
 
     with open("input_files/day11.txt") as input_file:
-        lines = input_file.readlines()
+        monkeys_1, monkeys_2 = read_monkeys(input_file)
 
-    monkeys = read_monkeys(StringIO(''.join(lines)))
-    solution_1 = do_monkey_business(monkeys, rounds=20, part_1=True)
+    # items = []
+    # for monkey in monkeys_1:
+    #     for item in monkey.items:
+    #         items.append(item.worry_level)
+    # print(items)
+    # print(len(items))
+    # print(len(set(items)))
+    solution_1 = do_monkey_business(monkeys_1,
+                                    rounds=20,
+                                    inspector=inspection_part_1)
 
-    monkeys = read_monkeys(StringIO(''.join(lines)))
-    solution_2 = do_monkey_business(monkeys, rounds=10000)
+    set_initial_modulos(monkeys_2)
+    solution_2 = do_monkey_business(monkeys_2,
+                                    rounds=10_000,
+                                    inspector=inspection_part_2)
 
     stop = time.perf_counter_ns()
 
@@ -301,7 +312,7 @@ def main() -> None:
     print(f"Day 11 part 1: {part_1} {solution_1}")
 
     assert solution_2 == 24389045529
-    print(f"Day 11 part 2: {part_2} {solution_2}")
+    print(f"Day 11 part 2: {part_2} {solution_2:_}")
 
     print(f"Day 11 took {(stop - start) * 10 ** -6:.3f} ms")
 

@@ -1,9 +1,10 @@
 """Day 10: Cathode Ray Tube."""
 from __future__ import annotations
+
 import time
 from abc import ABC, abstractmethod
-from typing import IO, Any, Final
 from collections.abc import Callable
+from typing import IO, Any, Final
 
 Registers = list[int]
 Params = list[Any]
@@ -64,7 +65,7 @@ class ClockSignalListener(ABC):
         cpu.register_listener(self)
 
     @abstractmethod
-    def callback(self, cycle_nr: int, registers: list[int]):
+    def callback(self, cycle_nr: int, registers: list[int]) -> None:
         """This must be implemented by concrete classes."""
 
         pass
@@ -84,7 +85,7 @@ class SignalStrengthListener(ClockSignalListener):
         self._total_signal_strength = 0
         self._next_cycle = 20
 
-    def callback(self, cycle_nr: int, registers: list[int]):
+    def callback(self, cycle_nr: int, registers: list[int]) -> None:
         """Update total signal strength if it's a cycle we're interested in
         (cycles 20, 60, 100, 140 etc.)"""
 
@@ -109,7 +110,7 @@ class CRT(ClockSignalListener):
         super().__init__(cpu)
         self._screen = [" "] * self._lines * self._pix_per_line
 
-    def callback(self, cycle_nr: int, registers: list[int]):
+    def callback(self, cycle_nr: int, registers: list[int]) -> None:
         """Write a pixel. The location of the pixel is determined by cycle_nr,
         the pixel content ("█" or " ") is determined by the horizontal sprite
         position (in register[0])."""
@@ -118,8 +119,7 @@ class CRT(ClockSignalListener):
         crt_position = cycle_nr - 1
         crt_vertical_position = crt_position % self._pix_per_line
         pixel_value = \
-            "█" if crt_vertical_position in sprite_vertical_positions \
-            else " "
+            "█" if crt_vertical_position in sprite_vertical_positions else " "
         self._screen[cycle_nr - 1] = pixel_value
 
     def get_result(self) -> str:
@@ -135,7 +135,7 @@ class CRT(ClockSignalListener):
 class CPU:
     """The CPU."""
 
-    __nr_registers: Final = 1      # Currently only 1 register needed
+    __nr_registers: Final = 1  # Currently only 1 register needed
 
     def __init__(self,
                  instructions: tuple[CPUInstruction, ...],
@@ -147,12 +147,12 @@ class CPU:
         self._cycle_count = 0
         self._listeners: list[ClockSignalListener] = []
 
-    def register_listener(self, listener: ClockSignalListener):
+    def register_listener(self, listener: ClockSignalListener) -> None:
         """Register the listener and its callback."""
 
         self._listeners.append(listener)
 
-    def __increment_cycles(self, nr_to_add: int):
+    def __increment_cycles(self, nr_to_add: int) -> None:
         """Update the cycle count (add one at the time, since all listeners
         expect to be called on each new cycle)."""
 
@@ -176,7 +176,7 @@ class CPU:
         instruction.params = parts[1:]
         return instruction
 
-    def start(self):
+    def start(self) -> None:
         """Start fetching and executing instructions until all processed."""
 
         while instruction := self.__fetch_instruction():
@@ -228,7 +228,7 @@ def main() -> None:
     stop = time.perf_counter_ns()
 
     assert solution_1 == 14340
-    print(f"Day 10 part 1: {part_1} {solution_1}")
+    print(f"Day 10 part 1: {part_1} {solution_1:_}")
 
     capitals = "███   ██  ███    ██  ██  ███  █  █ ███  \n" \
                "█  █ █  █ █  █    █ █  █ █  █ █  █ █  █ \n" \

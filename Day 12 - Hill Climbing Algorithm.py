@@ -1,5 +1,6 @@
 """Day 12: Hill Climbing Algorithm."""
 from __future__ import annotations
+
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -84,7 +85,7 @@ class AscendingStrategy(MazeStrategy):
                     matrix: Matrix,
                     current: Coordinate,
                     neighbor: Coordinate) -> bool:
-        """Return True if neighbor if 'valid', that is, on grid, not visited
+        """Return True if neighbor is 'valid', that is, on grid, not visited
         yet, and not high/low relative to current."""
 
         if neighbor in self.visited:
@@ -221,7 +222,7 @@ def get_maze(file: str) -> Maze:
     return Maze(Matrix([line[:-1] for line in lines]))
 
 
-def main():
+def main() -> None:
     """Solve the puzzle."""
 
     part_1 = "What is the fewest steps required to move from your current " \
@@ -236,22 +237,26 @@ def main():
 
     start_pos = maze.matrix.replace("S", "a")
     finish_pos = maze.matrix.replace("E", "z")
-
-    solution_1 = maze.find_shortest_path(AscendingStrategy(start_pos,
-                                                           finish_pos))
+    solution_1 = None
+    if start_pos is not None and finish_pos is not None:
+        solution_1 = maze.find_shortest_path(AscendingStrategy(start_pos,
+                                                               finish_pos))
 
     # Finding the shortest path for ANY "a" to the finish position is
     # equivalent to finding the shortest path from the finish position to
     # any "a".
-    solution_2 = maze.find_shortest_path(DescendingToLowestLevel(finish_pos))
+    solution_2 = None
+    if finish_pos is not None:
+        solution_2 = maze.find_shortest_path(
+            DescendingToLowestLevel(finish_pos))
 
     stop = time.perf_counter_ns()
 
     assert solution_1 == 380
-    print(f"Day 12 part 1: {part_1} {solution_1}")
+    print(f"Day 12 part 1: {part_1} {solution_1:_}")
 
     assert solution_2 == 375
-    print(f"Day 12 part 2: {part_2} {solution_2}")
+    print(f"Day 12 part 2: {part_2} {solution_2:_}")
 
     print(f"Day 12 took {(stop - start) * 10 ** -6:.3f} ms")
 

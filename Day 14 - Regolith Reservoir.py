@@ -3,7 +3,7 @@ import re
 import time
 from itertools import pairwise
 
-Coordinate = tuple[int, ...]
+Coordinate = tuple[int, int]
 
 
 class Cave:
@@ -61,17 +61,21 @@ class Cave:
             for y in range(min(y_coordinates), max(y_coordinates) + 1):
                 self._blocked_coordinates.add((x, y))
 
+    @staticmethod
+    def _string_to_coordinate(coordinate_string: str) -> Coordinate:
+        coordinates_list = coordinate_string.split(",")
+        return int(coordinates_list[0]), int(coordinates_list[1])
+
     def _process_coordinate_line(self, line: str) -> None:
         """Process all information xy pairs (xxx,yyy) on the line. The
-        coordinate_ints are successive (x, y) tuples. These and all the
+        coordinates are successive (x, y) tuples. These and all the
         coordinates between two tuples (forming a horizontal or vertical line
         segment) are rocks and therefore blocked."""
 
-        coordinate_ints: list[Coordinate] = \
-            [tuple(map(int, pair.split(",")))
-             for pair in re.findall(r"\d+,\d+", line)]
+        coordinates = [self._string_to_coordinate(pair)
+                       for pair in re.findall(r"\d+,\d+", line)]
 
-        for first, last in pairwise(coordinate_ints):
+        for first, last in pairwise(coordinates):
             # Both first and last are (x, y) tuples.
             self._add_intermediate_coordinates(first, last)
 
@@ -80,7 +84,7 @@ class Cave:
         blocked coordinates."""
 
         with open(file_name) as input_file:
-            lines = input_file.readlines()
+            lines = input_file.read().splitlines()
 
         # While trying to improve performance, I discovered that there are a
         # lot of equal lines in the input (54 out of 148 are not unique).
@@ -115,10 +119,10 @@ def main() -> None:
     stop = time.perf_counter_ns()
 
     assert solution_1 == 737
-    print(f"Day 14 part 1: {part_1} {solution_1}")
+    print(f"Day 14 part 1: {part_1} {solution_1:_}")
 
     assert solution_2 == 28145
-    print(f"Day 14 part 2: {part_2} {solution_2}")
+    print(f"Day 14 part 2: {part_2} {solution_2:_}")
 
     print(f"Day 14 took {(stop - start) * 10 ** -6:.3f} ms")
 

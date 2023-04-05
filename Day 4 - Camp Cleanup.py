@@ -1,7 +1,9 @@
 """Day 4: Camp Cleanup."""
 import re
 import time
-from typing import Iterable
+
+# typing.Iterable deprecated since version 3.9.
+from collections.abc import Iterable
 
 
 def is_overlap(range_pair: Iterable[int]) -> bool:
@@ -46,7 +48,7 @@ def main() -> None:
             overlap += 1
 
     solution_1 = containment
-    solution_2 = containment + overlap      # containment implies overlap!
+    solution_2 = containment + overlap  # containment implies overlap!
 
     stop = time.perf_counter_ns()
 

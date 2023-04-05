@@ -7,10 +7,8 @@ from AoCLib.Miscellaneous import intersect_all, union_all
 Compartment = set[str]
 Rucksack = set[str]
 Rucksacks = tuple[Rucksack, ...]
-RucksackAsCompartments = tuple[Compartment, ...]
+RucksackAsCompartments = tuple[Compartment, Compartment]
 RucksacksAsCompartments = tuple[RucksackAsCompartments, ...]
-RucksackGroup = tuple[Rucksack, ...]
-RucksackGroups = tuple[RucksackGroup, ...]
 
 
 def char_to_priority(char: str) -> int:
@@ -37,9 +35,8 @@ def get_rucksacks_as_compartments(raw_file_lines: list[str]) \
     {'g', 'C', 'j', 'z', 'D', 'S', 'c', 't', 'r'}).
     All these tuples are put in a containing tuple.
     """
-
-    return tuple(tuple((set(raw_line[:len(raw_line) // 2]),
-                        set(raw_line[len(raw_line) // 2:-1]))
+    return tuple(tuple((set(raw_line[:(offset := (len(raw_line) // 2))]),
+                        set(raw_line[offset:]))
                        for raw_line in raw_file_lines))
 
 
@@ -53,15 +50,6 @@ def get_compartments_intersects(
                  for rucksack_compartments in rucksacks_as_compartments)
 
 
-def get_group_intersects(rucksack_groups: RucksackGroups) -> tuple[str, ...]:
-    """Return a tuple of chars. Each char is the intersection of a group of
-    rucksacks. It is assumed there is exactly 1 element in each intersection!
-    """
-
-    return tuple(intersect_all(rucksack_group).pop()
-                 for rucksack_group in rucksack_groups)
-
-
 def get_rucksacks(rucksacks_as_compartments: RucksacksAsCompartments) \
         -> Rucksacks:
     """Return a tuple of sets. Each set is the union of a rucksack's two
@@ -71,12 +59,47 @@ def get_rucksacks(rucksacks_as_compartments: RucksacksAsCompartments) \
                  for rucksack_compartments in rucksacks_as_compartments)
 
 
-def get_rucksack_groups(rucksacks: Rucksacks, groupsize: int) \
+RucksackGroup = tuple[Rucksack, Rucksack, Rucksack]
+RucksackGroups = tuple[RucksackGroup, ...]
+
+
+def get_rucksack_group(rucksacks: Rucksacks, offset: int) -> RucksackGroup:
+    """Return a group of three successive rucksacks from rucksacks, starting
+    at given offset."""
+
+    # Unfortunately, neither Mypy nor Pycharm is smart enough to detect the
+    # size of the slice rucksacks[offset: offset + 3] as 3. Therefore
+    #
+    #   return tuple(rucksacks[offset: offset + 3])
+    #
+    # leads to:
+    # Mypy error: Incompatible return value type (got "Tuple[Set[str], ...]",
+    #       expected "Tuple[Set[str], Set[str], Set[str]]")  [return-value]
+    # PyCharm warning: Expected type 'tuple[set[str], set[str], set[str]]',
+    #       got 'tuple[set[str], ...]' instead
+    # The following code is a simple work-around.
+    # return rucksacks[offset], rucksacks[offset + 1], rucksacks[offset + 2]
+    # Another workaround:
+    # return cast(RucksackGroup, tuple(rucksacks[offset: offset + 3]))
+
+    return rucksacks[offset], rucksacks[offset + 1], rucksacks[offset + 2]
+
+
+def get_rucksack_groups(rucksacks: Rucksacks) \
         -> RucksackGroups:
     """Return a tuple of all rucksack groups."""
 
-    return tuple(tuple(rucksacks[i * groupsize: ((i + 1) * groupsize)])
-                 for i in range(len(rucksacks) // groupsize))
+    return tuple(get_rucksack_group(rucksacks, i * 3)
+                 for i in range(len(rucksacks) // 3))
+
+
+def get_group_intersects(rucksack_groups: RucksackGroups) -> tuple[str, ...]:
+    """Return a tuple of chars. Each char is the intersection of a group of
+    rucksacks. It is assumed there is exactly 1 element in each intersection!
+    """
+
+    return tuple(intersect_all(rucksack_group).pop()
+                 for rucksack_group in rucksack_groups)
 
 
 def main() -> None:
@@ -92,13 +115,13 @@ def main() -> None:
     start = time.perf_counter_ns()
 
     with open("input_files/day3.txt") as file:
-        compartments = get_rucksacks_as_compartments(file.readlines())
+        compartments = get_rucksacks_as_compartments(file.read().splitlines())
 
     compartment_intersect_chars = get_compartments_intersects(compartments)
     solution_1 = sum(map(char_to_priority, compartment_intersect_chars))
 
     rucksacks = get_rucksacks(compartments)
-    groups = get_rucksack_groups(rucksacks, groupsize=3)
+    groups = get_rucksack_groups(rucksacks)
     group_intersect_chars = get_group_intersects(groups)
     solution_2 = sum(map(char_to_priority, group_intersect_chars))
 
