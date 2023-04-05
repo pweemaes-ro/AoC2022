@@ -1,7 +1,7 @@
 """Day 1: Calorie Counting"""
 import time
-from heapq import nlargest
 from collections.abc import Generator
+from heapq import nlargest
 
 
 def get_elf_calories(filename: str) -> Generator[int, None, None]:
@@ -12,14 +12,13 @@ def get_elf_calories(filename: str) -> Generator[int, None, None]:
             calories = 0
             while (line := input_file.readline()) and line != "\n":
                 calories += int(line)
-
-            if calories:
-                yield calories
-            else:
+            if calories == 0:
                 break
 
+            yield calories
 
-def main():
+
+def main() -> None:
     """Solve the problems."""
 
     part_1 = "Find the Elf carrying the most Calories. How many total " \
