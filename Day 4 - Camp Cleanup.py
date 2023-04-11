@@ -1,13 +1,15 @@
 """Day 4: Camp Cleanup."""
 import re
 import time
+from collections.abc import Sequence
+from typing import TypeAlias
 
-# typing.Iterable deprecated since version 3.9.
-from collections.abc import Iterable
+# type alias
+RangePair: TypeAlias = Sequence[int]
 
 
-def is_overlap(range_pair: Iterable[int]) -> bool:
-    """range_pair is assumed to be a list of 4 integers p <= q, r <= s.
+def is_overlap(range_pair: RangePair) -> bool:
+    """range_pair is assumed to be a sequence of 4 integers p <= q, r <= s.
     Return True if range(p, q) and range(r, s) overlap, else returns False."""
 
     p, q, r, s = range_pair
@@ -15,14 +17,20 @@ def is_overlap(range_pair: Iterable[int]) -> bool:
     return (r <= p <= s) or (p <= r <= q)
 
 
-def is_containment(range_pair: Iterable[int]) -> bool:
-    """range_pair is assumed to be sa list of 4 integers p <= >q, r <= s.
+def is_containment(range_pair: RangePair) -> bool:
+    """range_pair is assumed to be a sequence of 4 integers p <= q, r <= s.
     Return True if range(p, q) contains range(r, s) or range(r, s) contains
     range(p, q), else returns False."""
 
     p, q, r, s = range_pair
 
     return (p >= r and q <= s) or (r >= p and s <= q)
+
+
+def get_range_pair(line: str) -> RangePair:
+    """Convert integers in line to a RangePair (Sequence of four ints)."""
+
+    return tuple(map(int, re.findall(r"\d+", line)))
 
 
 def main() -> None:
@@ -37,14 +45,13 @@ def main() -> None:
     with open("input_files/day4.txt") as file:
         lines = file.readlines()
 
-    tuples_of_ints = tuple(tuple(map(int, re.findall(r"\d+", line)))
-                           for line in lines)
+    range_pairs = tuple(get_range_pair(line) for line in lines)
 
     containment = overlap = 0
-    for list_of_ints in tuples_of_ints:
-        if is_containment(list_of_ints):
+    for range_pair in range_pairs:
+        if is_containment(range_pair):
             containment += 1
-        elif is_overlap(list_of_ints):
+        elif is_overlap(range_pair):
             overlap += 1
 
     solution_1 = containment

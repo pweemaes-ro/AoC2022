@@ -1,14 +1,9 @@
 """Day 3: Rucksack Reorganization"""
 import time
+from collections.abc import Sequence
+from typing import TypeAlias
 
-from AoCLib.Miscellaneous import intersect_all, union_all
-
-# For readability we define several often used types
-Compartment = set[str]
-Rucksack = set[str]
-Rucksacks = tuple[Rucksack, ...]
-RucksackAsCompartments = tuple[Compartment, Compartment]
-RucksacksAsCompartments = tuple[RucksackAsCompartments, ...]
+from AoCLib.Miscellaneous import intersect_all
 
 
 def char_to_priority(char: str) -> int:
@@ -22,84 +17,62 @@ def char_to_priority(char: str) -> int:
         return ord(char) - 38   # 38 = ord('A') - 27
 
 
-def get_rucksacks_as_compartments(raw_file_lines: list[str]) \
-        -> RucksacksAsCompartments:
-    """Return a tuple of tuples (one per rucksack) of sets (one per
-    compartment) of (unique) items in each of the two compartment of the
-    rucksack.
+# Type aliases:
+Rucksack: TypeAlias = str
+Rucksacks: TypeAlias = list[Rucksack]
+RucksackGroup: TypeAlias = tuple[set[str], set[str], set[str]]
+RucksackGroups: TypeAlias = tuple[RucksackGroup, ...]
+RucksackCompartment: TypeAlias = set[str]
+CompartmentsPair: TypeAlias = tuple[RucksackCompartment, ...]
+CompartmentsPairs: TypeAlias = tuple[CompartmentsPair, ...]
 
-    For example, raw file line "PnJJfVPBcfVnnPnBFFcggttrtgCrjDtSjzSS\n"
-    is split in two equal size parts (the \n is dropped): "PnJJfVPBcfVnnPnBFF"
-    and "cggttrtgCrjDtSjzSS", which are converted to a tuple of sets of chars:
-    ({'F', 'V', 'P', 'B', 'J', 'n', 'c', 'f'},
-    {'g', 'C', 'j', 'z', 'D', 'S', 'c', 't', 'r'}).
-    All these tuples are put in a containing tuple.
+
+def rucksack_to_compartments(rucksack: Rucksack) -> CompartmentsPair:
+    """Return CompartmentsPair (tuple of set of items per compartment).
     """
-    return tuple(tuple((set(raw_line[:(offset := (len(raw_line) // 2))]),
-                        set(raw_line[offset:]))
-                       for raw_line in raw_file_lines))
+
+    compartment_length = len(rucksack) // 2
+
+    return (set(rucksack[:compartment_length]),
+            set(rucksack[compartment_length:]))
 
 
-def get_compartments_intersects(
-        rucksacks_as_compartments: RucksacksAsCompartments) -> tuple[str, ...]:
-    """Return a tuple of chars. Each char is the intersection of single
-    rucksack's compartments. It is assumed there is exactly 1 element in each
-    intersection!"""
+def get_compartment_pairs(rucksacks: Rucksacks) -> CompartmentsPairs:
+    """Return Compartments (tuple of CompartmentPairs, one pair for each
+    rucksack in rucksacks).
+    """
 
-    return tuple(intersect_all(rucksack_compartments).pop()
-                 for rucksack_compartments in rucksacks_as_compartments)
-
-
-def get_rucksacks(rucksacks_as_compartments: RucksacksAsCompartments) \
-        -> Rucksacks:
-    """Return a tuple of sets. Each set is the union of a rucksack's two
-    compartments, and therefor the set of unique items in the ruchsack."""
-
-    return tuple(union_all(rucksack_compartments)
-                 for rucksack_compartments in rucksacks_as_compartments)
+    return tuple(rucksack_to_compartments(rucksack)
+                 for rucksack in rucksacks)
 
 
-RucksackGroup = tuple[Rucksack, Rucksack, Rucksack]
-RucksackGroups = tuple[RucksackGroup, ...]
+def rucksacks_to_group_sets(rucksacks: Rucksacks, offset: int) \
+        -> RucksackGroup:
+    """Return RucksackGroup (tuple of three sets of chars, one set (of unique
+    chars) per rucksack, starting at offset in rucksacks).
+    """
+
+    return set(rucksacks[offset * 3]), \
+        set(rucksacks[offset * 3 + 1]), \
+        set(rucksacks[offset * 3 + 2])
 
 
-def get_rucksack_group(rucksacks: Rucksacks, offset: int) -> RucksackGroup:
-    """Return a group of three successive rucksacks from rucksacks, starting
-    at given offset."""
+def get_rucksack_groups(rucksacks: Rucksacks) -> RucksackGroups:
+    """Return RucksackGroups (tuple of RucksackGroup items, one per group of 3
+    rucksacks in rucksacks).
+    """
 
-    # Unfortunately, neither Mypy nor Pycharm is smart enough to detect the
-    # size of the slice rucksacks[offset: offset + 3] as 3. Therefore
-    #
-    #   return tuple(rucksacks[offset: offset + 3])
-    #
-    # leads to:
-    # Mypy error: Incompatible return value type (got "Tuple[Set[str], ...]",
-    #       expected "Tuple[Set[str], Set[str], Set[str]]")  [return-value]
-    # PyCharm warning: Expected type 'tuple[set[str], set[str], set[str]]',
-    #       got 'tuple[set[str], ...]' instead
-    # The following code is a simple work-around.
-    # return rucksacks[offset], rucksacks[offset + 1], rucksacks[offset + 2]
-    # Another workaround:
-    # return cast(RucksackGroup, tuple(rucksacks[offset: offset + 3]))
-
-    return rucksacks[offset], rucksacks[offset + 1], rucksacks[offset + 2]
-
-
-def get_rucksack_groups(rucksacks: Rucksacks) \
-        -> RucksackGroups:
-    """Return a tuple of all rucksack groups."""
-
-    return tuple(get_rucksack_group(rucksacks, i * 3)
+    return tuple(rucksacks_to_group_sets(rucksacks, i)
                  for i in range(len(rucksacks) // 3))
 
 
-def get_group_intersects(rucksack_groups: RucksackGroups) -> tuple[str, ...]:
-    """Return a tuple of chars. Each char is the intersection of a group of
-    rucksacks. It is assumed there is exactly 1 element in each intersection!
+def get_intersection_chars(groups_of_sets: Sequence[Sequence[set[str]]]) \
+        -> Sequence[str]:
+    """Return a tuple of intersection characters.
     """
 
-    return tuple(intersect_all(rucksack_group).pop()
-                 for rucksack_group in rucksack_groups)
+    return tuple(intersect_all(group_of_sets).pop()
+                 for group_of_sets in groups_of_sets)
 
 
 def main() -> None:
@@ -115,15 +88,16 @@ def main() -> None:
     start = time.perf_counter_ns()
 
     with open("input_files/day3.txt") as file:
-        compartments = get_rucksacks_as_compartments(file.read().splitlines())
+        rucksacks = file.read().splitlines()
 
-    compartment_intersect_chars = get_compartments_intersects(compartments)
-    solution_1 = sum(map(char_to_priority, compartment_intersect_chars))
+    compartment_pairs = get_compartment_pairs(rucksacks)
+    rucksack_groups = get_rucksack_groups(rucksacks)
 
-    rucksacks = get_rucksacks(compartments)
-    groups = get_rucksack_groups(rucksacks)
-    group_intersect_chars = get_group_intersects(groups)
-    solution_2 = sum(map(char_to_priority, group_intersect_chars))
+    compartment_pairs_intersections = get_intersection_chars(compartment_pairs)
+    rucksack_groups_intersections = get_intersection_chars(rucksack_groups)
+
+    solution_1 = sum(map(char_to_priority, compartment_pairs_intersections))
+    solution_2 = sum(map(char_to_priority, rucksack_groups_intersections))
 
     stop = time.perf_counter_ns()
 

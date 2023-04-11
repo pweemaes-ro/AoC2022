@@ -1,112 +1,101 @@
 """Day 5: Supply Stacks"""
 import time
+from collections.abc import Sequence, Callable
 from copy import deepcopy
+from typing import TypeAlias
 
 from AoCLib.Miscellaneous import transposed
 
-Stack = list[str]
-Stacks = list[Stack]
-MultiStacks = tuple[Stacks, ...]
-MoveInfo = tuple[int, ...]
-MoveInfos = tuple[MoveInfo, ...]
+# type aliases
+Stack: TypeAlias = list[str]
+Stacks: TypeAlias = list[Stack]
+Move: TypeAlias = Sequence[int]
 
 
-def _line_to_labels(line: str) -> list[str]:
-    """Return a list of labels based on a line. Example:
-    line "    [J]     [W] [V] [Q] [W] [F]    " is converted to list of labels:
-    [" ". "J", " ", "W", "V", "Q", "W", "F", " "]. Notice that missing labels
-    (anywhere) are replaced by empty strings ("")."""
+def _stack_row(line: str) -> list[str]:
+    """Return a list of labels based on a line. Example: line
+    '    [V]     [M] [W] [S]     [Q]'
+    is converted to list of (always!) 9 one char strings:
+    [' '. 'V', ' ', 'M', 'W', 'S', ' ', 'Q', ' ']
+    Notice that 'missing' labels (anywhere) are replaced by ' '."""
 
     nr_labels = (len(line) + 1) // 4
-    nr_extra_blanks = 9 - nr_labels
 
     labels = [line[i * 4 + 1] for i in range(nr_labels)]
-    extra_blanks = [" " for _ in range(nr_extra_blanks)]
+    extra_blanks = [" " for _ in range(9 - nr_labels)]
 
     return labels + extra_blanks
 
 
-def _remove_blanks(stack: list[str]) -> list[str]:
-    """Removes all " " items from the stack."""
+def create_stacks(lines: Sequence[str]) -> Stacks:
+    """Return stacks, created from the data in the file."""
 
-    # while stack[0] == " ":
-    #     stack.pop(0)
-    # return stack
-    try:
-        while True:
-            stack.remove(" ")
-    except ValueError:
-        return stack
+    stack_rows = [_stack_row(stack_line) for stack_line in lines]
+    stack_columns = transposed(stack_rows)
 
+    for stack in stack_columns:
+        while stack[-1] == ' ':
+            stack.pop()
 
-def create_stacks(lines: list[str], nr_stacks: int) \
-        -> MultiStacks:
-    """Return a tuple of identical but independent stacks, created from the
-    data in the file"""
-
-    label_lines = [_line_to_labels(stack_line)
-                   for stack_line in lines]
-    stacks = transposed(label_lines)
-    for stack in stacks:
-        stack.reverse()
-    stacks = [_remove_blanks(stack) for stack in stacks]
-
-    return (stacks,) + tuple(deepcopy(stacks) for _ in range(nr_stacks - 1))
+    return stack_columns
 
 
-def _create_move_info(move_line: str) -> MoveInfo:
-    """Return MoveInfos created from the data in move_line."""
+def _create_move(move_line: str) -> Move:
+    """Return a Move (a tuple(nr_to_move, from_stack_idx, to_stack_idx),
+    created from the data in move_line, expected in format 'move <nr_to_move>
+    from <from_stack> to <to_stack>'."""
 
-    parts = move_line.split(" ")
-    return int(parts[1]), int(parts[3]) - 1, int(parts[5]) - 1
-
-
-def create_move_infos(lines: list[str]) -> MoveInfos:
-    """Return a list of MoveInfos created from data in the file."""
-
-    return tuple(_create_move_info(move_line)
-                 for move_line in lines)
+    _, nr_to_move, _, from_stack, _, to_stack = move_line.split(" ")
+    # stack idxs are 0 based in code, 1-based in move_line, so subtract 1!
+    return int(nr_to_move), int(from_stack) - 1, int(to_stack) - 1
 
 
-def _remove_from_stacks(all_stacks: MultiStacks,
-                        nr_to_move: int,
-                        from_stack_idx: int) -> tuple[list[str], ...]:
-    """Creates a tuple of two lists of items that were removed from one stack
-    and must be extended to another."""
+def create_moves(move_lines: Sequence[str]) -> Sequence[Move]:
+    """Return a list of Moves created from data in the file."""
 
-    removed_lists = tuple([stacks[from_stack_idx].pop(-1)
-                           for _ in range(nr_to_move)]
-                          for stacks in all_stacks)
-    return removed_lists
+    return tuple(_create_move(move_line) for move_line in move_lines)
 
 
-def _add_to_stacks(all_stacks: MultiStacks,
-                   to_stack_idx: int,
-                   extend_lists: tuple[list[str], ...]) -> None:
-    """Extends the stack at pos to_stack_idx for all stacks in all_stacks with
-    the corresponding extend_list"""
+def _do_move_part_1(stacks: Stacks, move: Sequence[int]) -> None:
+    """Executes the move on the stacks."""
 
-    for stacks, extend_list in zip(all_stacks, extend_lists):
-        stacks[to_stack_idx].extend(extend_list)
+    nr_to_move, from_idx, to_idx = move
 
-
-def do_moves(all_stacks: MultiStacks, all_moves: MoveInfos) -> None:
-    """Execute all moves on all stacks."""
-
-    for move in all_moves:
-        _do_move(all_stacks, *move)
+    _do_move(stacks,
+             items_to_move=stacks[from_idx][:-nr_to_move - 1:-1],
+             from_idx=from_idx,
+             to_idx=to_idx)
 
 
-def _do_move(all_stacks: MultiStacks,
-             nr_to_move: int,
-             from_stack_idx: int,
-             to_stack_idx: int) -> None:
-    """Executes (on all stacks in MultiStacks) the move of nr_to_move items
-    from stack with index from_stack_idx to stack with index to_stack_idx."""
+def _do_move_part_2(stacks: Stacks, move: Sequence[int]) -> None:
+    """Executes the move on the stacks."""
 
-    removed_lists = _remove_from_stacks(all_stacks, nr_to_move, from_stack_idx)
-    removed_lists[1].reverse()  # For Part 2 order must be reversed.
-    _add_to_stacks(all_stacks, to_stack_idx, removed_lists)
+    nr_to_move, from_idx, to_idx = move
+
+    _do_move(stacks,
+             items_to_move=stacks[from_idx][-nr_to_move:],
+             from_idx=from_idx,
+             to_idx=to_idx)
+
+
+def _do_move(stacks: Stacks,
+             items_to_move: list[str], *,
+             from_idx: int,
+             to_idx: int) \
+        -> None:
+
+    stacks[to_idx].extend(items_to_move)
+    del stacks[from_idx][-len(items_to_move):]
+
+
+def do_moves(stacks: Stacks,
+             moves: Sequence[Move], *,
+             move_function: Callable[[Stacks, Sequence[int]], None]) \
+        -> None:
+    """Execute all moves on the stacks."""
+
+    for move in moves:
+        move_function(stacks, move)
 
 
 def main() -> None:
@@ -119,15 +108,18 @@ def main() -> None:
     start = time.perf_counter_ns()
 
     with open("input_files/day5.txt") as input_file:
-        # Create (initially identical) stacks, one for each part.
         lines = input_file.read().splitlines()
 
-    all_stacks = create_stacks(lines[:8], nr_stacks=2)
-    all_moves = create_move_infos(lines[10:])
+    stacks_1 = create_stacks(lines[7::-1])  # Notice the reversed order
+    stacks_2 = deepcopy(stacks_1)
 
-    do_moves(all_stacks, all_moves)
-    solution_1 = "".join(stack[-1] for stack in all_stacks[0])
-    solution_2 = "".join(stack[-1] for stack in all_stacks[1])
+    moves = create_moves(lines[10:])
+
+    do_moves(stacks_1, moves, move_function=_do_move_part_1)
+    do_moves(stacks_2, moves, move_function=_do_move_part_2)
+
+    solution_1 = "".join(stack[-1] for stack in stacks_1)
+    solution_2 = "".join(stack[-1] for stack in stacks_2)
 
     stop = time.perf_counter_ns()
 

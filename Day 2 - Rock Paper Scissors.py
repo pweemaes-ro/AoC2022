@@ -1,7 +1,7 @@
 """Day 2: Rock Paper Scissors"""
 import time
 
-"""The scores dict:
+"""The play_to_score dict:
 1) Each key has two chars, separated by a space char. The first char is the 
    elf's choice, the second your choice. A an X are Rock, B and Y are Paper, C 
    and Z are Scissors.
@@ -11,7 +11,7 @@ import time
       Scissors).
 Rules: Rock beats Scissors, Scissors beat Paper, Paper beats Rock."""
 
-scores: dict[str, int] = \
+play_to_score = \
     {"A X": 3 + 1,  # Elf's Rock A vs. your Rock X: Draw
      "A Y": 6 + 2,  # Elf's Rock A vs. your Paper Y: You win
      "A Z": 0 + 3,  # Elf's Rock A vs. your Scissors Z: You lose
@@ -23,7 +23,7 @@ scores: dict[str, int] = \
      "C Z": 3 + 3   # Elf's Scissors C vs. your Scissors Z: Draw
      }
 
-"""The choices dict:
+"""The result_to_play dict:
 1) Each key has two chars, separated by a space char. The first char is the 
    elf's choice, the second is the desired result: X = you must loose, Y = you 
    must draw, Z = you must win.
@@ -33,7 +33,7 @@ scores: dict[str, int] = \
      the desired result (as specified in the second char of the key) is 
      realized."""
 
-choices: dict[str, str] = \
+result_to_play = \
     {"A X": "A Z",  # Must loose. Elf's Rock A vs. your Scissors Z: you loose
      "A Y": "A X",  # Must draw. Elf's Rock A vs. your Rock X: draw
      "A Z": "A Y",  # Must win. Elf's Rock A vs. your Paper Y: you win
@@ -47,18 +47,13 @@ choices: dict[str, str] = \
 
 
 def get_scores() -> tuple[int, int]:
-    """Return scores for both parts (strategies)."""
-
-    total_score_1 = total_score_2 = 0
+    """Return play_to_score for both parts (strategies)."""
 
     with open("input_files/day2.txt") as input_file:
-        lines = [line[:-1] for line in input_file.readlines()]
+        lines = input_file.read().splitlines()
 
-    # This could be done in two comprehensions, but this is slightly slower
-    # and (perhaps) a little bit more readable.
-    for line in lines:
-        total_score_1 += scores[line]
-        total_score_2 += scores[choices[line]]
+    total_score_1 = sum(play_to_score[line] for line in lines)
+    total_score_2 = sum(play_to_score[result_to_play[line]] for line in lines)
 
     return total_score_1, total_score_2
 

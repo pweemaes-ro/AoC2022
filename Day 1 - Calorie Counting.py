@@ -1,10 +1,10 @@
 """Day 1: Calorie Counting"""
 import time
-from collections.abc import Generator
+from collections.abc import Iterator
 from heapq import nlargest
 
 
-def get_elf_calories(filename: str) -> Generator[int, None, None]:
+def get_elf_calories(filename: str) -> Iterator[int]:
     """Return a generator that yields calories per elf."""
 
     with open(filename) as input_file:
