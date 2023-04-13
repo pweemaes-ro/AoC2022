@@ -2,208 +2,157 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
-from enum import StrEnum
+from collections import defaultdict
+from itertools import accumulate
+from typing import Iterable
+
+part_1 = "Find all of the directories with a total size of at most " \
+         "100000. What is the sum of the total sizes of those directories?"
 
 
-class Command(StrEnum):
-    """The commands + a command marker that are currently supported."""
-
-    COMMAND_MARKER = "$"
-    CHANGE_DIR = "cd"
-    LIST = "ls"
+part_2 = "Find the smallest directory that, if deleted, would free up " \
+         "enough space on the filesystem to run the update. What is the " \
+         "total size of that directory?"
 
 
-class FSO:
-    """The nodes for a File System (files and directories)."""
+class Directory:
+    """There is NO NEED to store files, since all we care about is the size of
+    directories. See add_filesize!"""
 
-    class FsoTypes(StrEnum):
-        """The following types are currently supported in a fso tree."""
+    def __init__(self, parent: Directory | None = None) -> None:
+        self.__parent_dir = parent or self
+        self.__size = 0
+        self.__subdirs: dict[str, Directory] = dict()
 
-        DIR = "dir"
-        FILE = "file"
+    def add_subdir(self, name: str) -> None:
+        """Add a subdir with given 'name' to 'self' directory. Note: No check
+        whether a sub directory with 'name' already exists! If so, it will be
+        overwritten (=> size will be reset to 0)!"""
 
-    class FsoDirs(StrEnum):
-        """The following special directory names are currently supported in a
-        fso tree."""
+        self.__subdirs[name] = Directory(self)
 
-        ROOT = "/"
-        PARENT = ".."
+    def add_filesize(self, size: int) -> None:
+        """Add 'size' to the size of self and (recursively) its parents."""
 
-    def __init__(self, name: str, fso_type: FsoTypes, size: int = 0) -> None:
-        self._name = name
-        self._parent: FSO = self
-        self._type = fso_type
-        self._size = 0 if type == FSO.FsoTypes.DIR else size
-        self._children: dict[str, FSO] = dict()
-        self._dirty = False
+        self.__size += size
 
-    @property
-    def name(self) -> str:
-        """Return the name of this fso."""
-
-        return self._name
+        if self.__parent_dir != self:
+            self.__parent_dir.add_filesize(size)
 
     @property
-    def fso_size(self) -> int:
-        """Return the size of this fso."""
+    def size(self) -> int:
+        """Return the size of (files in) 'self' directory."""
 
-        if self._type == FSO.FsoTypes.DIR:
-            if self._dirty:
-                self._size = sum(child.fso_size
-                                 for child in self._children.values())
-                self._set_dirty(False)
+        return self.__size
 
-        return self._size
+    def get_all_dirs(self) -> Iterable[Directory]:
+        """Yield Directories 'self' and all its subdirs."""
 
-    @property
-    def fso_type(self) -> FSO.FsoTypes:
-        """Return the type ("file" or "dir") of the fso."""
+        yield self
 
-        return self._type
+        for sub_dir in self.__subdirs.values():
+            yield from sub_dir.get_all_dirs()
 
-    @property
-    def parent(self) -> FSO:
-        """Return the parent dir of this fso."""
+    def sub_dir(self, name: str) -> Directory:
+        """Return the subdirectory of 'self' directory with the specified name.
+        Note: NO checks whether subdirectory exists. If it does not exist, a
+        KeyError will be raised."""
 
-        return self._parent
-
-    def is_root(self) -> bool:
-        """Return True if this is the root fso object (the only one for which
-        the parent is itself."""
-
-        return self._parent == self
-
-    def add(self, component: FSO) -> None:
-        """Add component as child to this fso. Note: No check whether child
-        with same name as component already exists!"""
-
-        self._children[component.name] = component
-        component._parent = self
-        self._set_dirty(True)
-
-    def collect(self, filter_func: Callable) -> list[FSO]:
-        """Return a list of all items (incl. self) that satisfy the filter."""
-
-        fso_list = []
-        if filter_func(self):
-            fso_list.append(self)
-
-        for child in self._children.values():
-            fso_list.extend(child.collect(filter_func))
-
-        return fso_list
-
-    def _set_dirty(self, dirty: bool) -> None:
-        """If dirty == True. sets this fso and all parent dirs up to the root
-        directory 'dirty' to indicate that fso_sizes of these dirs must be
-        recalculated when fso_size is queried. If dirty is False, the dirty
-        flag is cleared for this fso (but not for its parent dirs)."""
-
-        self._dirty = dirty
-        if dirty and not self.is_root():
-            self._parent._set_dirty(dirty)
-
-    def child(self, name: str) -> FSO:
-        """Return the child of this fso with the specified name."""
-
-        return self._children[name]
+        return self.__subdirs[name]
 
     @property
-    def root(self) -> FSO:
-        """Return the root of the fso."""
-        fso = self
-        while not fso.is_root():
-            fso = fso._parent
-        return fso
+    def parent_dir(self) -> Directory:
+        """Return the parent directory of this directory."""
+
+        return self.__parent_dir
 
 
-def dirs_le_size(size: int) -> Callable[[FSO], bool]:
-    """Filter function. Only dirs with fso_size <= size."""
+def build_directory_tree(all_lines: list[str]) -> Directory:
+    """Build the directory tree from data in all_lines. Return the root of the
+    tree."""
 
-    def _filter_func(fso: FSO) -> bool:
-        return fso.fso_type == FSO.FsoTypes.DIR \
-            and fso.fso_size <= size
-    return _filter_func
-
-
-def dirs_ge_size(size: int) -> Callable[[FSO], bool]:
-    """Filter function. Only dirs with fso_size >= size."""
-
-    def _filter_func(fso: FSO) -> bool:
-        return fso.fso_type == FSO.FsoTypes.DIR \
-            and fso.fso_size >= size
-    return _filter_func
-
-
-def _process_cd(current_dir: FSO, param: str) -> FSO:
-
-    if param == FSO.FsoDirs.ROOT:
-        return current_dir.root
-    elif param == FSO.FsoDirs.PARENT:
-        return current_dir.parent
-    elif len(param):
-        return current_dir.child(param)
-    else:
-        raise ValueError(f"Unexpected empty param for cd command!")
-
-
-def _add_fso(current_dir: FSO, size_or_dir: str, name: str) -> None:
-    if size_or_dir == FSO.FsoTypes.DIR:
-        current_dir.add(FSO(name, FSO.FsoTypes.DIR))
-    else:
-        current_dir.add(FSO(name, FSO.FsoTypes.FILE, int(size_or_dir)))
-
-
-def build_fso_tree(all_lines: list[str], current_dir: FSO) -> None:
-    """Build the fso tree from data in all_lines."""
+    root = current_dir = Directory()
 
     for line in all_lines:
-        terms = line.split()
+        match line.split():
+            case "$", "cd", "..":
+                current_dir = current_dir.parent_dir
+            case "$", "cd", "/":
+                current_dir = root
+            case "$", "cd", dir_name:
+                current_dir = current_dir.sub_dir(dir_name)
+            case '$', 'ls':
+                pass
+            case "dir", dir_name:
+                current_dir.add_subdir(dir_name)
+            case size, _:
+                current_dir.add_filesize(int(size))
 
-        match terms[0]:
-            case Command.COMMAND_MARKER:
-                match terms[1]:
-                    case Command.CHANGE_DIR:
-                        current_dir = _process_cd(current_dir, terms[2])
-                    case Command.LIST:
-                        pass
-                    case _:
-                        raise ValueError(f"Unrecognized command: '{terms[1]}'")
-            case _:     # output from the last command
-                _add_fso(current_dir, terms[0], terms[1])
+    return root
 
 
 def main() -> None:
     """Solve the puzzle."""
 
-    part_1 = "Find all of the directories with a total size of at most " \
-             "100000. What is the sum of the total sizes of those directories?"
-
-    part_2 = "Find the smallest directory that, if deleted, would free up " \
-             "enough space on the filesystem to run the update. What is the " \
-             "total size of that directory?"
-
     start = time.perf_counter_ns()
+
     with open("input_files/day7.txt") as input_file:
         all_lines = input_file.readlines()
 
-    root = FSO(FSO.FsoDirs.ROOT, FSO.FsoTypes.DIR)
-    build_fso_tree(all_lines, root)
+    root = build_directory_tree(all_lines)
+    all_sizes = list(directory.size for directory in root.get_all_dirs())
+    free_needed = root.size - 40_000_000
 
-    solution_1 = sum(fso.fso_size
-                     for fso in root.collect(dirs_le_size(100_000)))
-
-    must_free = 30_000_000 - (70_000_000 - root.fso_size)
-    solution_2 = min([fso.fso_size
-                      for fso in root.collect(dirs_ge_size(must_free))])
+    solution_1 = sum(filter(lambda size: size <= 100_000, all_sizes))
+    solution_2 = min(filter(lambda size: size >= free_needed, all_sizes))
 
     stop = time.perf_counter_ns()
 
-    assert solution_1 == 1743217
+    assert solution_1 == 1_743_217
     print(f"Day 7 part 1: {part_1} {solution_1:_}")
 
-    assert solution_2 == 8319096
+    assert solution_2 == 8_319_096
+    print(f"Day 7 part 2: {part_2} {solution_2:_}")
+
+    print(f"Day 7 took {(stop - start) * 10 ** -6:.3f} ms")
+
+
+def main_2() -> None:
+    """Sublime solution using accumulate to build paths and keep track of
+    sizes! Taken from (but slightly changed) https://www.reddit.com/r/
+    adventofcode/comments/zesk40/comment/iz8fww6/?utm_source=share&
+    utm_medium=web2x&context=3"""
+
+    start = time.perf_counter_ns()
+
+    dirs: dict[str, int] = defaultdict(int)
+
+    with open("input_files/day7.txt") as input_file:
+        for line in input_file:
+            match line.split():
+                case '$', 'cd', '/':
+                    curr = ['/']
+                case '$', 'cd', '..':
+                    curr.pop()
+                case '$', 'cd', x:
+                    curr.append(x + '/')
+                case '$', 'ls':
+                    pass
+                case 'dir', _:
+                    pass
+                case size, _:
+                    for p in accumulate(curr):
+                        dirs[p] += int(size)
+
+    solution_1 = sum(s for s in dirs.values() if s <= 100_000)
+    solution_2 = min(s for s in dirs.values() if s >= dirs['/'] - 40_000_000)
+
+    stop = time.perf_counter_ns()
+
+    assert solution_1 == 1_743_217
+    print(f"Day 7 part 1: {part_1} {solution_1:_}")
+
+    assert solution_2 == 8_319_096
     print(f"Day 7 part 2: {part_2} {solution_2:_}")
 
     print(f"Day 7 took {(stop - start) * 10 ** -6:.3f} ms")
@@ -211,3 +160,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    # Note: solve_all will NOT call main_2(), only calls main().
+    main_2()
