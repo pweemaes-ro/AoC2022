@@ -31,13 +31,13 @@ class Directory:
 
         self.__subdirs[name] = Directory(self)
 
-    def add_filesize(self, size: int) -> None:
+    def add_to_size(self, size: int) -> None:
         """Add 'size' to the size of self and (recursively) its parents."""
 
         self.__size += size
 
         if self.__parent_dir != self:
-            self.__parent_dir.add_filesize(size)
+            self.__parent_dir.add_to_size(size)
 
     @property
     def size(self) -> int:
@@ -86,7 +86,7 @@ def build_directory_tree(all_lines: list[str]) -> Directory:
             case "dir", dir_name:
                 current_dir.add_subdir(dir_name)
             case size, _:
-                current_dir.add_filesize(int(size))
+                current_dir.add_to_size(int(size))
 
     return root
 

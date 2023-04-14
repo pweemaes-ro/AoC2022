@@ -3,7 +3,7 @@ import time
 from collections.abc import Sequence
 from typing import TypeAlias
 
-from AoCLib.Miscellaneous import intersect_all
+from AoCLib.Sets import intersect_all
 
 
 def char_to_priority(char: str) -> int:

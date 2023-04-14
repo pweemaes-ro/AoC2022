@@ -4,7 +4,7 @@ from collections.abc import Sequence, Callable
 from copy import deepcopy
 from typing import TypeAlias
 
-from AoCLib.Miscellaneous import transposed
+from AoCLib.Matrices import transpose
 
 # type aliases
 Stack: TypeAlias = list[str]
@@ -31,7 +31,7 @@ def create_stacks(lines: Sequence[str]) -> Stacks:
     """Return stacks, created from the data in the file."""
 
     stack_rows = [_stack_row(stack_line) for stack_line in lines]
-    stack_columns = transposed(stack_rows)
+    stack_columns = transpose(stack_rows)
 
     for stack in stack_columns:
         while stack[-1] == ' ':
