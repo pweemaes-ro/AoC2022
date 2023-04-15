@@ -1,115 +1,94 @@
 """Day 8: Treetop Tree House."""
 import time
-from dataclasses import dataclass, field
-from math import prod
+from dataclasses import dataclass
+from typing import TypeAlias
 
-from AoCLib.Miscellaneous import transposed
+from Matrices import transposed
 
 
 @dataclass
 class Tree:
-    """A simple dataclass. Height is the value in the input. Visible is True
-    if the tree is visible from one or more sides."""
+    """A simple dataclass representing a tree and a few methods."""
 
     height: int
-    scenic_score: int = 0
-    visible: bool = False
-    scenic_scores: list[int] = field(default_factory=list)
+    scenic_score = 1
+    visible = False
+
+    def set_tree_visibility(self, height_to_beat: int) -> int:
+        """Set the visibility of the tree. Return the height to beat for the
+        next tree in the same row."""
+
+        # Note: This solution calculates the visibility of each tree for each
+        # direction (from the right, left, top or bottom). Strictly speaking,
+        # once a tree is visible from one direction, there's no need to check
+        # its visibility from any remaining directories. There's no point in
+        # checking this, since we always need to check if self.height >
+        # height_to_beat, even if the tree's visibility is already set to True.
+
+        if 9 != height_to_beat < self.height:
+            height_to_beat = self.height
+            self.visible = True
+
+        return height_to_beat
+
+    def update_scenic_score(self, other_trees: list["Tree"]) -> None:
+        """Return the scenic score for the tree. This is the nr of trees until
+        a larger or equally large tree is encountered."""
+
+        score = 0
+
+        for other_tree in other_trees:
+            score += 1
+            if self.height <= other_tree.height:
+                break
+
+        if score:
+            self.scenic_score *= score
 
 
-TreeRow = list[Tree]
-TreeMatrix = list[TreeRow]
-
-
-def _get_scenic_score(tree: Tree, other_trees: TreeRow) -> int:
-    """Return the scenic score for the tree. This is the nr of trees until a
-    larger or equally large tree is encountered."""
-
-    score = 0
-
-    for other_tree in other_trees:
-        score += 1
-        if tree.height <= other_tree.height:
-            break
-
-    return score
-
-
-def _set_visibility(tree: Tree, largest_height_so_far: int) -> int:
-    """Set tree visibility to True if tree is higher than the highest tree
-    in the row so far. Return (the possibly new value for) the height of the
-    highest tree in the row"""
-
-    if tree.height > largest_height_so_far:
-        largest_height_so_far = tree.height
-        tree.visible = True
-    return largest_height_so_far
-
-
-def _process_directed_row(tree_row: TreeRow) -> None:
-    """Process trees in the row (from left to right only!)."""
-
-    row_length = len(tree_row)
-    highest_tree_in_row = -1
-
-    for i, tree in enumerate(tree_row, start=1):
-        highest_tree_in_row = _set_visibility(tree, highest_tree_in_row)
-        other_trees = tree_row[i: row_length]
-        score = _get_scenic_score(tree, other_trees)
-        tree.scenic_scores.append(score)
-
-
-def _process_row(matrix_row: TreeRow) -> None:
-    """Process the row by delegating to _process_directed_row for original row
-    AND the reversed row."""
-    
-    for directed_treerow in (matrix_row, matrix_row[::-1]):
-        _process_directed_row(directed_treerow)
-
-
-def _process_matrix(matrix: TreeMatrix) -> None:
-    """Checks and sets tree visibility of the trees in the matrix by 
-    delegating to _process_row for each row."""
-
-    for tree_row in matrix:
-        _process_row(tree_row)
-
-
-def _update_scenic_score_products(matrix: TreeMatrix) -> None:
-    """Calculates and sets the product of the tree's 4 scenics scores."""
-
-    for tree_row in matrix:
-        for tree in tree_row:
-            tree.scenic_score = prod(tree.scenic_scores)
+# type aliases
+TreeRow: TypeAlias = list["Tree"]
+TreeMatrix: TypeAlias = list[TreeRow]
 
 
 def get_max_scenic_score(matrix: TreeMatrix) -> int:
     """Return the maximum scenic score found in the matric of trees."""
 
-    return max([tree.scenic_score for tree_row in matrix for tree in tree_row])
+    return max([tree.scenic_score
+                for tree_row in matrix
+                for tree in tree_row])
 
 
 def count_visible_trees(matrix: TreeMatrix) -> int:
     """Return the nr of trees visible from the outside."""
 
-    return sum(tree.visible for row in matrix for tree in row)
+    # We take advantage of the fact that True == 1 and False == 0
+    return sum(tree.visible
+               for row in matrix
+               for tree in row)
 
 
-def set_visibility_and_scores(matrix: TreeMatrix) -> None:
-    """Sets all relevant data members of each tree (visibility, scenic scores,
-    the product of the scenic scores."""
+def _process_tree_row(tree_row: TreeRow) -> None:
+    """Process trees in the row (from left to right only!)."""
 
-    for directed_matrix in (matrix, transposed(matrix)):
-        _process_matrix(directed_matrix)
+    height_to_beat = -1
+    for i, tree in enumerate(tree_row, start=1):
+        height_to_beat = tree.set_tree_visibility(height_to_beat)
+        tree.update_scenic_score(tree_row[i:])
 
-    _update_scenic_score_products(matrix)
+
+def process_forest(forest_matrix: TreeMatrix) -> None:
+    """Sets visibility and scenis_score of each tree."""
+
+    for row, col in zip(forest_matrix, transposed(forest_matrix)):
+        for direction in (row, row[::-1], col, col[::-1]):
+            _process_tree_row(direction)
 
 
-def build_matrix(lines: list[str]) -> TreeMatrix:
-    """Build a matrix of trees with height according to data in lines. Notice
-    that all lines have "\n" so ignore last char on each line."""
+def build_forest_matrix(lines: list[str]) -> TreeMatrix:
+    """Build a matrix of trees with height according to data in lines."""
 
-    return [[Tree(int(s)) for s in line[:-1]] for line in lines]
+    return [[Tree(int(s)) for s in line] for line in lines]
 
 
 def main() -> None:
@@ -123,13 +102,13 @@ def main() -> None:
     start = time.perf_counter_ns()
 
     with open("input_files/day8.txt") as input_file:
-        lines = input_file.readlines()
+        lines = input_file.read().splitlines()
 
-    matrix = build_matrix(lines)
-    set_visibility_and_scores(matrix)
+    forest_matrix = build_forest_matrix(lines)
+    process_forest(forest_matrix)
 
-    solution_1 = count_visible_trees(matrix)
-    solution_2 = get_max_scenic_score(matrix)
+    solution_1 = count_visible_trees(forest_matrix)
+    solution_2 = get_max_scenic_score(forest_matrix)
 
     stop = time.perf_counter_ns()
 

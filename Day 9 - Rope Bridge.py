@@ -7,24 +7,20 @@ from dataclasses import dataclass, field
 class Knot:
     """A simple dataclass."""
 
-    x: int
-    y: int
-    _locations: set[tuple[int, ...]] = field(default_factory=set)
+    x: int      # Current x coordinate
+    y: int      # Current y coordinate
+    visited_locations: set[tuple[int, ...]] = field(default_factory=set)
 
-    def add_current_location(self) -> None:
-        """Adds current location to set of visited locations."""
-        self._locations.add((self.x, self.y))
+    def update_visited_locations(self) -> None:
+        """Add current knot location to the visited locatiosn."""
 
-    def nr_locations(self) -> int:
-        """ Return the nr of locations visited (so far) by this knot."""
-
-        return len(self._locations)
-
-
-Locations = set[Knot]
+        self.visited_locations.add((self.x, self.y))
 
 
 def _move_knot(knot: Knot, direction: str) -> None:
+    """Modify knot coordinates to reflect moving one step in the given
+    direction"""
+
     match direction:
         case "L":
             knot.x -= 1
@@ -39,20 +35,22 @@ def _move_knot(knot: Knot, direction: str) -> None:
 
 
 def _follow(head: Knot, tail: Knot) -> None:
-    """The heart of the solution: How should a tail at the given location move
-    if it is following the head towards its location?"""
+    """The heart of the solution: How should the tail move if it is stay
+    connected to the head?"""
 
     distance_x = abs(head.x - tail.x)
     distance_y = abs(head.y - tail.y)
 
     if distance_x < 2 and distance_y < 2:
+        # Tails is still connected, no need to move.
         return
 
-    avg_x = (head.x + tail.x) // 2
-    avg_y = (head.y + tail.y) // 2
-
-    tail.x = avg_x if distance_x == 2 else head.x
-    tail.y = avg_y if distance_y == 2 else head.y
+    # If the distance in a dimension is two, move to head and tail average
+    # coordinate that dimension, that is, go one left/right (for x dimension)
+    # or one up/down (for y dimension) in the direction of head. Else move to
+    # same coordinate as head.
+    tail.x = (head.x + tail.x) // 2 if distance_x == 2 else head.x
+    tail.y = (head.y + tail.y) // 2 if distance_y == 2 else head.y
 
 
 def _execute_step(direction: str,
@@ -61,40 +59,52 @@ def _execute_step(direction: str,
     """Execute a step in the given direction and after each step move each of
     the tails (if necessary) to keep them in touch with their predecessor."""
 
+    # Move the head (first knot) in the given direction.
     _move_knot(knots[0], direction)
 
+    # The other knots, one by one, follow the knot just before them...
     for i in range(1, len(knots)):
         _follow(knots[i - 1], knots[i])
 
+    # Keep track of the visited locations for the specified knots.
     for knot_idx in knot_idxs_to_watch:
-        knots[knot_idx].add_current_location()
+        knots[knot_idx].update_visited_locations()
 
 
-def _execute_steps(instruction: str,
-                   knots: tuple[Knot, ...],
-                   knot_idxs_to_watch: tuple[int, ...]) -> None:
+def _execute_instruction(instruction: str,
+                         knots: tuple[Knot, ...],
+                         knot_idxs_to_watch: tuple[int, ...]) -> None:
     """Execute a single instruction (= one or more steps). This is done by
     sequentially executing each required step (all in the same direction)."""
 
-    direction, steps = instruction.split()
-    for _ in range(int(steps)):
+    direction, nr_steps = instruction.split()
+
+    for _ in range(int(nr_steps)):
         _execute_step(direction, knots, knot_idxs_to_watch)
 
 
-def get_nr_locations(instructions: list[str],
-                     nr_knots: int,
-                     knot_idxs_to_watch: tuple[int, ...]) -> tuple[int, ...]:
-    """Return the nr of locations visited by the last knot in a sequence of
-    nr_knots. This is calculated by sequentially executing all (move)
-    instructions."""
-
-    knots = tuple(Knot(0, 0) for _ in range(nr_knots))
+def execute_instructions(instructions: list[str],
+                         knots: tuple[Knot, ...],
+                         knot_idxs_to_watch: tuple[int, ...]) -> None:
+    """Execute the instructions."""
 
     for instruction in instructions:
-        _execute_steps(instruction, knots, knot_idxs_to_watch)
+        _execute_instruction(instruction, knots, knot_idxs_to_watch)
 
-    return tuple(knots[knot_idx].nr_locations()
+
+def get_nr_locations(knots: tuple[Knot, ...],
+                     knot_idxs_to_watch: tuple[int, ...]) -> tuple[int, ...]:
+    """Return the nr of locations visited by the knots whose ids are in
+    knot_idxs_to_watch."""
+
+    return tuple(len(knots[knot_idx].visited_locations)
                  for knot_idx in knot_idxs_to_watch)
+
+
+def create_knots(nr_knots: int) -> tuple[Knot, ...]:
+    """Return a tuple of 'nr_knots' knots, initially located at (0,0)."""
+
+    return tuple(Knot(0, 0) for _ in range(nr_knots))
 
 
 def main() -> None:
@@ -111,9 +121,10 @@ def main() -> None:
     with open("input_files/day9.txt") as input_file:
         instructions = input_file.readlines()
 
-    solution_1, solution_2 = get_nr_locations(instructions,
-                                              nr_knots=10,
-                                              knot_idxs_to_watch=(1, 9))
+    knots = create_knots(10)
+    knot_idxs_to_watch = (1, 9)
+    execute_instructions(instructions, knots, knot_idxs_to_watch)
+    solution_1, solution_2 = get_nr_locations(knots, knot_idxs_to_watch)
 
     stop = time.perf_counter_ns()
 

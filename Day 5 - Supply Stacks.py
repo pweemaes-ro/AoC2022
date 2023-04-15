@@ -4,7 +4,7 @@ from collections.abc import Sequence, Callable
 from copy import deepcopy
 from typing import TypeAlias
 
-from AoCLib.Matrices import transpose
+from AoCLib.Matrices import transposed
 
 # type aliases
 Stack: TypeAlias = list[str]
@@ -31,7 +31,7 @@ def create_stacks(lines: Sequence[str]) -> Stacks:
     """Return stacks, created from the data in the file."""
 
     stack_rows = [_stack_row(stack_line) for stack_line in lines]
-    stack_columns = transpose(stack_rows)
+    stack_columns = transposed(stack_rows)
 
     for stack in stack_columns:
         while stack[-1] == ' ':
@@ -56,46 +56,20 @@ def create_moves(move_lines: Sequence[str]) -> Sequence[Move]:
     return tuple(_create_move(move_line) for move_line in move_lines)
 
 
-def _do_move_part_1(stacks: Stacks, move: Sequence[int]) -> None:
-    """Executes the move on the stacks."""
-
-    nr_to_move, from_idx, to_idx = move
-
-    _do_move(stacks,
-             items_to_move=stacks[from_idx][:-nr_to_move - 1:-1],
-             from_idx=from_idx,
-             to_idx=to_idx)
-
-
-def _do_move_part_2(stacks: Stacks, move: Sequence[int]) -> None:
-    """Executes the move on the stacks."""
-
-    nr_to_move, from_idx, to_idx = move
-
-    _do_move(stacks,
-             items_to_move=stacks[from_idx][-nr_to_move:],
-             from_idx=from_idx,
-             to_idx=to_idx)
-
-
-def _do_move(stacks: Stacks,
-             items_to_move: list[str], *,
-             from_idx: int,
-             to_idx: int) \
-        -> None:
-
-    stacks[to_idx].extend(items_to_move)
-    del stacks[from_idx][-len(items_to_move):]
-
-
 def do_moves(stacks: Stacks,
-             moves: Sequence[Move], *,
-             move_function: Callable[[Stacks, Sequence[int]], None]) \
+             moves: Sequence[Move],
+             items: Callable[[Stack, int], list[str]]) \
         -> None:
     """Execute all moves on the stacks."""
 
     for move in moves:
-        move_function(stacks, move)
+        nr_to_move, from_stack_idx, to_stack_idx = move
+
+        from_stack = stacks[from_stack_idx]
+        items_to_move = items(from_stack, nr_to_move)
+
+        stacks[to_stack_idx].extend(items_to_move)
+        del from_stack[-len(items_to_move):]
 
 
 def main() -> None:
@@ -115,8 +89,8 @@ def main() -> None:
 
     moves = create_moves(lines[10:])
 
-    do_moves(stacks_1, moves, move_function=_do_move_part_1)
-    do_moves(stacks_2, moves, move_function=_do_move_part_2)
+    do_moves(stacks_1, moves, items=lambda stack, nr: stack[:-(nr + 1):-1])
+    do_moves(stacks_2, moves, items=lambda stack, nr: stack[-nr:])
 
     solution_1 = "".join(stack[-1] for stack in stacks_1)
     solution_2 = "".join(stack[-1] for stack in stacks_2)
