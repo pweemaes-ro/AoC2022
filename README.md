@@ -5,3 +5,5 @@ While many of the Python solutions on Reddit seem to focus on solving the proble
 I appreciate all suggestions for improvement in performance or otherwise, as long as they keep the code pythonic.
 
 Cheers!
+
+PS. This is a project in progress... There is no deadline, I might pick up on it in the future, and I might not. 
