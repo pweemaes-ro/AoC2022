@@ -3,30 +3,29 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable
-from typing import IO, Any, Final
+from collections.abc import Callable, MutableSequence, Sequence
+from typing import IO, Any, Final, TypeAlias, Optional
 
-Registers = list[int]
-Params = list[Any]
-Executor = Callable[[Registers, Params], Registers]
-ClockListenerCallback = Callable[[int, Registers], None]
+# type aliases for convenience and readability ;-)
+Registers: TypeAlias = MutableSequence[int]
+Params: TypeAlias = Sequence[Any]
+Executor: TypeAlias = Callable[[Registers, Params], Registers]
+ClockListenerCallback: TypeAlias = Callable[[int, Registers], None]
 
 
 class CPUInstruction:
     """CPUInstruction class."""
 
-    def __init__(self, name: str, max_nr_params: int, cycles: int,
-                 executor: Executor):
-        self._name = name
-        self._cycles = cycles
-        self._executor = executor
-        self._max_nr_params = max_nr_params
-        self._params: list[Any] = []
+    def __init__(self, name: str, cycles: int, executor: Executor) -> None:
+        self.__name = name
+        self.__cycles = cycles
+        self.__executor = executor
+        self.__params: Params = []
 
     def _params_setter(self, params: Params) -> None:
         """Property getter"""
 
-        self._params = params
+        self.__params = params
 
     # noinspection PyArgumentEqualDefault
     # No need for a property getter, so must use functional way of creating
@@ -38,40 +37,38 @@ class CPUInstruction:
     def name(self) -> str:
         """Return the name of the instruction."""
 
-        return self._name
+        return self.__name
 
-    def execute(self, registers: list[int]) -> list[int]:
+    def execute(self, registers: Registers) -> Registers:
         """Execute this instruction (by calling its executor) using the
         params."""
 
-        result = self._executor(registers, self._params)
-        self._params = []
-        return result
+        return self.__executor(registers, self.__params)
 
     @property
     def cycles(self) -> int:
         """Return the nr of cycles that execution of this instruction takes."""
 
-        return self._cycles
+        return self.__cycles
 
 
 class ClockSignalListener(ABC):
     """Abstract base class for Clock Listeners."""
 
-    def __init__(self, cpu: CPU):
+    def __init__(self, cpu: CPU) -> None:
         """Store the cpu and register yourself with the cpu."""
 
-        self._cpu = cpu
+        self.__cpu = cpu
         cpu.register_listener(self)
 
     @abstractmethod
-    def callback(self, cycle_nr: int, registers: list[int]) -> None:
+    def callback(self, cycle_nr: int, registers: Registers) -> None:
         """This must be implemented by concrete classes."""
 
         pass
 
     @abstractmethod
-    def get_result(self) -> Any:
+    def get_status(self) -> Any:
         """This must be implemented by concrete classes."""
 
         pass
@@ -80,113 +77,121 @@ class ClockSignalListener(ABC):
 class SignalStrengthListener(ClockSignalListener):
     """A concrete Clock Listener."""
 
-    def __init__(self, cpu: CPU):
+    def __init__(self, cpu: CPU) -> None:
         super().__init__(cpu)
-        self._total_signal_strength = 0
-        self._next_cycle = 20
+        self.__total_signal_strength = 0
+        self.__next_cycle = 20
 
-    def callback(self, cycle_nr: int, registers: list[int]) -> None:
-        """Update total signal strength if it's a cycle we're interested in
-        (cycles 20, 60, 100, 140 etc.)"""
+    def callback(self, cycle_nr: int, registers: Registers) -> None:
+        """Update total signal strength if it's a cycle we're interested in.
+        We are interested in cycles 20, 60, 100, 140 etc."""
 
-        if cycle_nr == self._next_cycle:
-            self._total_signal_strength += cycle_nr * registers[0]
-            self._next_cycle += 40
+        if cycle_nr == self.__next_cycle:
+            self.__total_signal_strength += cycle_nr * registers[0]
+            self.__next_cycle += 40
 
-    def get_result(self) -> int:
-        """Return the current value of the sum of the signal strengths."""
+    def get_status(self) -> int:
+        """Return the current value of the signal strength."""
 
-        return self._total_signal_strength
+        return self.__total_signal_strength
 
 
 class CRT(ClockSignalListener):
     """The CRT listens to the clock, since every clock_tick it prints a pixel
     on the screen."""
 
-    _lines: Final = 6
-    _pix_per_line: Final = 40
+    __lines: Final = 6
+    __pix_per_line: Final = 40
+    __display_chars = ('⚪', '🔴')
 
-    def __init__(self, cpu: CPU):
+    def __init__(self, cpu: CPU) -> None:
         super().__init__(cpu)
-        self._screen = [" "] * self._lines * self._pix_per_line
+        self.__screen = [[" "
+                          for _ in range(self.__pix_per_line)]
+                         for _ in range(self.__lines)]
 
-    def callback(self, cycle_nr: int, registers: list[int]) -> None:
-        """Write a pixel. The location of the pixel is determined by cycle_nr,
-        the pixel content ("█" or " ") is determined by the horizontal sprite
-        position (in register[0])."""
+    def callback(self, cycle_nr: int, registers: Registers) -> None:
+        """Write a pixel. The location of the pixel to write is determined by
+        the cycle_nr, the content of the pixel ("█" or " ") is determined by
+        whether the crt horizontal position is one of the three horizontal
+        positions taken up by the sprite (the middle of these is in
+        register[0])."""
 
-        sprite_vertical_positions = tuple(i + registers[0] for i in (-1, 0, 1))
-        crt_position = cycle_nr - 1
-        crt_vertical_position = crt_position % self._pix_per_line
-        pixel_value = \
-            "█" if crt_vertical_position in sprite_vertical_positions else " "
-        self._screen[cycle_nr - 1] = pixel_value
+        crt_v_pos, crt_h_pos = divmod(cycle_nr - 1, self.__pix_per_line)
 
-    def get_result(self) -> str:
+        if registers[0] - 1 <= crt_h_pos <= registers[0] + 1:
+            display_char = self.__display_chars[1]
+        else:
+            display_char = self.__display_chars[0]
+
+        self.__screen[crt_v_pos][crt_h_pos] = display_char
+
+    def get_status(self) -> str:
         """Return the image on the CRT."""
 
-        screen_to_str = ''.join(self._screen)
-        lines = [screen_to_str[i * self._pix_per_line:
-                               i * self._pix_per_line + self._pix_per_line]
-                 for i in range(self._lines)]
-        return "\n".join(lines)
+        return '\n'.join(''.join(line) for line in self.__screen)
 
 
 class CPU:
     """The CPU."""
 
-    __nr_registers: Final = 1  # Currently only 1 register needed
+    __nr_registers: Final = 1       # Spec: The CPU has a single register.
+    __registers_initial_value = 1   # Spec: Single register starts withvalue 1.
 
     def __init__(self,
-                 instructions: tuple[CPUInstruction, ...],
-                 instruction_bus: IO):
-        self._instructions = {instruction.name: instruction
-                              for instruction in instructions}
-        self._instruction_bus = instruction_bus
-        self._registers = [1 for _ in range(self.__nr_registers)]
-        self._cycle_count = 0
-        self._listeners: list[ClockSignalListener] = []
+                 supported_instructions: tuple[CPUInstruction, ...],
+                 instruction_bus: IO[str]) -> None:
+        """Initialize all class members."""
+
+        self.__instructions = {instruction.name: instruction
+                               for instruction in supported_instructions}
+        self.__instruction_bus = instruction_bus
+        self.__registers: Registers = [self.__registers_initial_value
+                                       for _ in range(self.__nr_registers)]
+        self.__cycle_count = 0
+        self.__listeners: list[ClockSignalListener] = []
 
     def register_listener(self, listener: ClockSignalListener) -> None:
-        """Register the listener and its callback."""
+        """Register the listener."""
 
-        self._listeners.append(listener)
+        self.__listeners.append(listener)
 
     def __increment_cycles(self, nr_to_add: int) -> None:
         """Update the cycle count (add one at the time, since all listeners
-        expect to be called on each new cycle)."""
+        expect to be called back on each new cycle)."""
 
         for i in range(nr_to_add):
-            self._cycle_count += 1
-            for listener in self._listeners:
-                listener.callback(self._cycle_count, self._registers)
+            self.__cycle_count += 1
+            for listener in self.__listeners:
+                listener.callback(self.__cycle_count, self.__registers)
 
-    def __fetch_instruction(self) -> CPUInstruction | None:
-        """Fetch instruction + params from the instruction bus."""
+    def __fetch_instruction(self) -> Optional[CPUInstruction]:
+        """Return instruction (if any) from instruction bus. Return None when
+        no more instructions available."""
 
-        if not (line := self._instruction_bus.readline()):
+        if not (line := self.__instruction_bus.readline()):
             return None
 
         parts = line.split()
 
-        instruction_name = parts[0]
-        instruction = self._instructions.get(instruction_name, None)
-        if not instruction:
-            return None
-        instruction.params = parts[1:]
+        instruction_name, params = parts[0], parts[1:]
+        instruction = self.__instructions[instruction_name]
+        instruction.params = params
+
         return instruction
 
     def start(self) -> None:
-        """Start fetching and executing instructions until all processed."""
+        """Fetch and execute all instructions from the instructions bus."""
 
         while instruction := self.__fetch_instruction():
             self.__increment_cycles(instruction.cycles)
-            self._registers = instruction.execute(self._registers)
+            self.__registers = instruction.execute(self.__registers)
 
 
 # noinspection PyUnusedLocal
 def noop_executor(registers: Registers, params: Params) -> Registers:
     """The executor for the noop instruction (noop = no operation)."""
+
     return registers
 
 
@@ -208,36 +213,41 @@ def main() -> None:
 
     start = time.perf_counter_ns()
 
+    noop = CPUInstruction(name="noop",
+                          cycles=1,
+                          executor=noop_executor)
+
+    addx = CPUInstruction(name="addx",
+                          cycles=2,
+                          executor=addx_executor)
+
     with open("input_files/day10.txt") as input_file:
-        noop = CPUInstruction(name="noop",
-                              cycles=1,
-                              max_nr_params=0,
-                              executor=noop_executor)
-        addx = CPUInstruction(name="addx",
-                              cycles=2,
-                              max_nr_params=1,
-                              executor=addx_executor)
-        cpu = CPU((noop, addx), input_file)
+        cpu = CPU(supported_instructions=(noop, addx),
+                  instruction_bus=input_file)
         signal_strength_device = SignalStrengthListener(cpu)
         crt = CRT(cpu)
         cpu.start()
 
-    solution_1 = signal_strength_device.get_result()
-    solution_2 = crt.get_result()
+    solution_1 = signal_strength_device.get_status()
+    solution_2 = crt.get_status()
 
     stop = time.perf_counter_ns()
 
     assert solution_1 == 14340
     print(f"Day 10 part 1: {part_1} {solution_1:_}")
 
-    capitals = "███   ██  ███    ██  ██  ███  █  █ ███  \n" \
-               "█  █ █  █ █  █    █ █  █ █  █ █  █ █  █ \n" \
-               "█  █ █  █ █  █    █ █    ███  ████ █  █ \n" \
-               "███  ████ ███     █ █    █  █ █  █ ███  \n" \
-               "█    █  █ █    █  █ █  █ █  █ █  █ █    \n" \
-               "█    █  █ █     ██   ██  ███  █  █ █    "
-    assert solution_2 == capitals
-    print(f"Day 10 part 2: {part_2} PAPJCBHP\n{capitals}")
+    screen_image = \
+        "🔴🔴🔴⚪⚪⚪🔴🔴⚪⚪🔴🔴🔴⚪⚪⚪⚪🔴🔴⚪⚪🔴🔴⚪⚪🔴🔴🔴⚪⚪🔴⚪⚪🔴⚪🔴🔴🔴⚪⚪\n" \
+        "🔴⚪⚪🔴⚪🔴⚪⚪🔴⚪🔴⚪⚪🔴⚪⚪⚪⚪🔴⚪🔴⚪⚪🔴⚪🔴⚪⚪🔴⚪🔴⚪⚪🔴⚪🔴⚪⚪🔴⚪\n" \
+        "🔴⚪⚪🔴⚪🔴⚪⚪🔴⚪🔴⚪⚪🔴⚪⚪⚪⚪🔴⚪🔴⚪⚪⚪⚪🔴🔴🔴⚪⚪🔴🔴🔴🔴⚪🔴⚪⚪🔴⚪\n" \
+        "🔴🔴🔴⚪⚪🔴🔴🔴🔴⚪🔴🔴🔴⚪⚪⚪⚪⚪🔴⚪🔴⚪⚪⚪⚪🔴⚪⚪🔴⚪🔴⚪⚪🔴⚪🔴🔴🔴⚪⚪\n" \
+        "🔴⚪⚪⚪⚪🔴⚪⚪🔴⚪🔴⚪⚪⚪⚪🔴⚪⚪🔴⚪🔴⚪⚪🔴⚪🔴⚪⚪🔴⚪🔴⚪⚪🔴⚪🔴⚪⚪⚪⚪\n" \
+        "🔴⚪⚪⚪⚪🔴⚪⚪🔴⚪🔴⚪⚪⚪⚪⚪🔴🔴⚪⚪⚪🔴🔴⚪⚪🔴🔴🔴⚪⚪🔴⚪⚪🔴⚪🔴⚪⚪⚪⚪"
+    # Fun fact: PyCharm COUNTS characters assuming all have standard width,
+    # which means the above lines do NOT exceed 80 chars (the PEP8 limit),
+    # since each line is only 41 chars...
+    assert solution_2 == screen_image
+    print(f"Day 10 part 2: {part_2} PAPJCBHP\n{solution_2}")
 
     print(f"Day 10 took {(stop - start) * 10 ** -6:.3f} ms")
 
