@@ -133,7 +133,12 @@ class CRT(ClockSignalListener):
 
 
 class CPU:
-    """The CPU."""
+    """The CPU. Note that for simplicity, we've 'integrated' the clock and the
+    CPU... The CPU makes the clock tick the required amount of times for each
+    executed instruction (1 for noop, 2 for addx). Since the CPU controls the
+    clock, the CPU is also where devices register if they want to be informed
+    on every new cycle, and the CPU informs those devices (sharing the
+    registers with these devices)."""
 
     __nr_registers: Final = 1       # Spec: The CPU has a single register.
     __registers_initial_value = 1   # Spec: Single register starts withvalue 1.
@@ -163,6 +168,8 @@ class CPU:
         for i in range(nr_to_add):
             self.__cycle_count += 1
             for listener in self.__listeners:
+                # Strictly speaking we should pass a COPY of the registers, so
+                # no external device can accidentally modify them...
                 listener.callback(self.__cycle_count, self.__registers)
 
     def __fetch_instruction(self) -> Optional[CPUInstruction]:
