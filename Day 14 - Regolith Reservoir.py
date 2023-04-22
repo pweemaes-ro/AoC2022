@@ -2,33 +2,48 @@
 import re
 import time
 from itertools import pairwise
+from typing import TypeAlias
 
-Coordinate = tuple[int, int]
+# type aliases
+Coordinate: TypeAlias = tuple[int, int]
 
 
 class Cave:
     """A cave is a collection of blocked coordinates and functionality to drop
     sand from a source. The blocked coordinates are either rocks (determined
-    from the data in the input file_name) or coordinates where sand came to
+    from the data in the input file) or coordinates where sand came to
     rest (determined during the dropping of sand)."""
 
     def __init__(self, file_name: str) -> None:
         self._blocked_coordinates: set[Coordinate] = set()
         self._get_rock_coordinates(file_name)
         self._max_y = max(c[1] for c in self._blocked_coordinates) + 2
-        self._solution_1: int = 0     # holds result for part 1
-        self._solution_2: int = 0          # holds result for part 2
+        self._solution_1: int = 0           # holds result for part 1
+        self._solution_2: int = 0           # holds result for part 2
 
-    def _drop_until_blocked(self, start: Coordinate) -> None:
-        """Move from start according to the move algorithm:
+    @property
+    def solution_1(self) -> int:
+        """Return the solution for part 1."""
+
+        return self._solution_1
+
+    @property
+    def solution_2(self) -> int:
+        """Return the solution for part 1."""
+
+        return self._solution_2
+
+    # def drop_sand(self, start_coordinate: Coordinate) -> tuple[int, int]:
+    def drop_sand(self, start_coordinate: Coordinate) -> None:
+        """Move from start_coordinate according to the move algorithm:
         0. Done if your new location is on the last row.
         1. Else: Go one down if not blocked,
         2. Else: Go one left + one down if not blocked,
         3. Else: Go right + down if not blocked.
         After each single step, the routine is called recursively with the
-        new location as start."""
+        new location as start_coordinate."""
 
-        candidate = (start[0], start[1] + 1)
+        candidate = (start_coordinate[0], start_coordinate[1] + 1)
         if candidate[1] == self._max_y:
             # At the bottom of the scan! Set solution 1 (only if not set yet)!
             self._solution_1 = self._solution_1 or self._solution_2
@@ -36,24 +51,17 @@ class Cave:
             for delta_x in (0, -1, 2):
                 candidate = (candidate[0] + delta_x, candidate[1])
                 if candidate not in self._blocked_coordinates:
-                    self._drop_until_blocked(candidate)
+                    self.drop_sand(candidate)
 
-        # Could not fall any further. Block the start location.
-        self._blocked_coordinates.add(start)
+        # Could not fall any further. Block the start_coordinate location.
+        self._blocked_coordinates.add(start_coordinate)
         self._solution_2 += 1
-
-    def drop_sand(self, source: Coordinate) -> tuple[int, int]:
-        """Drops sand from the source coordinate untill there is no more to
-        drop (the source of the sand gets blocked)."""
-
-        self._drop_until_blocked(source)
-        return self._solution_1, self._solution_2
 
     def _add_intermediate_coordinates(self,
                                       first: Coordinate,
                                       last: Coordinate) -> None:
-        """Adds coordinates first and last and all intermediate coordinates to
-        the cave's blocked coordinates."""
+        """Adds first, last and all intermediate coordinates to the cave's
+        blocked coordinates."""
 
         x_coordinates, y_coordinates = zip(first, last)
 
@@ -69,8 +77,8 @@ class Cave:
     def _process_coordinate_line(self, line: str) -> None:
         """Process all information xy pairs (xxx,yyy) on the line. The
         coordinates are successive (x, y) tuples. These and all the
-        coordinates between two tuples (forming a horizontal or vertical line
-        segment) are rocks and therefore blocked."""
+        coordinates between two successive tuples (forming a horizontal or
+        vertical line segment) are rocks and therefore blocked."""
 
         coordinates = [self._string_to_coordinate(pair)
                        for pair in re.findall(r"\d+,\d+", line)]
@@ -113,8 +121,8 @@ def main() -> None:
     start = time.perf_counter_ns()
 
     cave = Cave("input_files/day14.txt")
-
-    solution_1, solution_2 = cave.drop_sand((500, 0))
+    cave.drop_sand(start_coordinate=(500, 0))
+    solution_1, solution_2 = cave.solution_1, cave.solution_2
 
     stop = time.perf_counter_ns()
 
