@@ -1,6 +1,8 @@
 """Try 3..."""
+from collections.abc import Iterator
+from typing import Final
 
-colors = '⚪🟢🔴'
+from AoCLib.IntsAndBits import bit_set
 
 
 class JetStream:
@@ -8,204 +10,200 @@ class JetStream:
 	the stream, since this is very much dealing with state."""
 	
 	def __init__(self, jet_file: str):
+		
 		with open(jet_file) as jet_stream:
 			self.__jets = jet_stream.readline()[:-1]
 		self.__length = len(self.__jets)
 		self.__offset = 0
 	
-	def __iter__(self, item):
+	def __iter__(self) -> Iterator[str]:
+		
 		return self
 	
 	def __next__(self) -> str:
+		
 		jet_char = self.__jets[self.__offset]
 		self.__offset = (self.__offset + 1) % self.__length
 		return jet_char
 	
 	@property
-	def offset(self) -> int:
+	def current_offset(self) -> int:
+		"""Return the current offset in the jet stream."""
+		
 		return self.__offset
 
 
-def print_pf(pf: list[int]) -> None:
-	"""Print the field. Uses ⚪ for spaces, 🟢 for rocks."""
+class PlayField(list[int]):
+	"""Representation of the play field (rows of rock), and functionality to
+	drop - in a tetris-like manner - rocks. The left/right movements of falling
+	rocks are controlled by the jets."""
 	
-	# Todo: Function can be removed when code complete
-	row_nr = len(pf) - 1
-	for r in pf[::-1]:
-		print(f"{row_nr:4d}: {''.join(colors[int(c)] for c in f'{r:07b}')}")
-		# print(r)
-		row_nr -= 1
+	_colors: Final = '⚪🟢'
+	
+	def __init__(self, jet_stream: JetStream, rock_shapes: list[list[int]]) \
+		-> None:
+		
+		super().__init__([127])		# First row is full, so falling through...
+		self._jet_stream = jet_stream
+		self._rock_shapes = rock_shapes
+		
+		self._cycle_start_offset: int = 0
+		self._cycle_length = 0
+	
+	@staticmethod
+	def _can_move_to_right(rock_rows: list[int], play_field_rows: list[int]) \
+		-> bool:
+		"""Return True if it is ok to shift rock_rows to the right, else return
+		False."""
+		
+		# We can move the rock rows to the right if:
+		# a) All rock rows have bit 6 equal to 0, AND
+		# b) No bits in the play field overlap with where the rock would go
+		#    after shifting to the right.
+		return (not any(bit_set(n, bit_nr=0) for n in rock_rows)) and \
+			(not rows_overlap([i >> 1 for i in rock_rows], play_field_rows))
+	
+	@staticmethod
+	def _can_move_to_left(rock_rows: list[int], play_field_rows: list[int]) \
+		-> bool:
+		"""Return True if it is ok to shift rock_rows to the left, else return
+		False."""
+		
+		# We can move the rock rows to the left if:
+		# a) All rock rows have bit 6 equal to 0, AND
+		# b) No bits in the play field overlap with where the rock would go
+		#    after shifting to the right.
+		return (not any(bit_set(n, bit_nr=6) for n in rock_rows)) and \
+			(not rows_overlap([i << 1 for i in rock_rows], play_field_rows))
+	
+	def try_move_sideways(
+		self, rock_rows: list[int],
+		play_field_rows: list[int]) -> list[int]:
+		"""Shifts the rock rows in the specified direction if possible. Returns
+		the (possibly unchanged) rock rows."""
+		
+		direction = next(self._jet_stream)
+		
+		if direction == ">":
+			if self._can_move_to_right(rock_rows, play_field_rows):
+				return [i >> 1 for i in rock_rows]
+		else:
+			if self._can_move_to_left(rock_rows, play_field_rows):
+				return [i << 1 for i in rock_rows]
+		
+		return rock_rows
+	
+	def analyse(self) -> None:
+		"""Should analyse and determine all essential data"""
+	
+		pass
+		
+	def get_height_after_drops(self, nr_drops: int) -> int:
+		"""Returns the height after the specified nr of rocks has been dropped.
+		"""
+		
+		if nr_drops > 2022:
+			print(f"{nr_drops = } too high...")
+			return -1
+		
+		for n in range(nr_drops):
+			self._drop(n)
+		return self.height
+	
+	def _drop(self, n: int) -> None:
+		rock_shape = self._rock_shapes[n % 5]
+		rock_height = len(rock_shape)
+		
+		# Make sure here are sufficient empty rows.
+		while not self[-1]:
+			del self[-1]
+		self.extend([0] * 4)
+		
+		rock_start_row = len(self) - 1
+		
+		while True:
+			# Try to move one position to the left or right
+			sideways_window = self[rock_start_row:rock_start_row + rock_height]
+			rock_shape = self.try_move_sideways(rock_shape, sideways_window)
+			
+			down_window = self[rock_start_row - 1:
+							   rock_start_row - 1 + rock_height]
+			if rows_overlap(rock_shape, down_window):
+				break
+			else:
+				rock_start_row -= 1
+		
+		for i in range(rock_height):
+			self[rock_start_row + i] |= rock_shape[i]
+	
+	@property
+	def height(self) -> int:
+		"""Returns the height of the play field (which is not necessarily the
+		same as the nr of rows, since there may be empty rows on the top of
+		the play field)."""
+		
+		empty_rows = 0
+		
+		while not self[-(empty_rows + 1)]:
+			empty_rows += 1
+		
+		return len(self) - 1 - empty_rows
+	
+	def _prepare_next_drop(self) -> None:
+		"""Prepares the next drop by putting four empty lines above the
+		highest column in the playing field. Return the offset of the highest
+		non-empty row."""
+		
+		# Remove all empty rows from above
+		while not self[-1]:
+			del self[-1]
+		
+		# Add 4 empty rows (4 is the max height of a rock).
+		self.extend([0] * 4)
+	
+	def __str__(self) -> str:
+		"""Print the field. Uses ⚪ for spaces, 🟢 for rocks."""
+		
+		# Todo: Function can be removed when code complete
+		return '\n'.join(f"{row_nr:4d}: "
+						 f"{''.join(self._colors[int(c)] for c in f'{r:07b}')}"
+						 for row_nr, r in enumerate(self[::-1]))
 
 
-def rows_overlap(mask_rows: list[int], field_rows: list[int]) -> bool:
-	"""Return True if any row in mask_rows overlaps with its corresponding row
+def rows_overlap(rock_rows: list[int], field_rows: list[int]) -> bool:
+	"""Return True if any row in rock_rows overlaps with its corresponding row
 	in field_rows, else False."""
 	
-	return any(i & j for i, j in zip(mask_rows, field_rows))
-
-
-def bit_set(n: int, bit_nr: int) -> bool:
-	"""Return True if bit at (zero based) offset bit_nr is set in n, else
-	return False."""
-	
-	bit_value = 2 ** bit_nr
-	return bit_value & n == bit_value
-
-
-def can_shift_right(mask_rows: list[int], playfield_rows: list[int]) -> bool:
-	"""Return True if it is ok to shift mask_rows to the right, else return
-	False."""
-	
-	return (not any(bit_set(n, bit_nr=0) for n in mask_rows)) and \
-		(not rows_overlap(shift_right(mask_rows), playfield_rows))
-
-
-def can_shift_left(mask_rows: list[int], playfield_rows: list[int]) -> bool:
-	"""Return True if it is ok to shift mask_rows to the left, else return
-	False."""
-	
-	return (not any(bit_set(n, bit_nr=6) for n in mask_rows)) and \
-		(not rows_overlap(shift_left(mask_rows), playfield_rows))
-
-
-# def can_move_down(mask_rows: list[int], playfield_rows: list[int]):
-# 	"""Return True if it is ok to move mask_rows down, else return
-# 	False. Notice that 'playfield_rows' are the rows on the playfield where
-# 	the mask would end up after moving down."""
-# 	return not rows_overlap(mask_rows, playfield_rows)
-
-
-def shift_right(mask_rows: list[int]) -> list[int]:
-	return [i >> 1 for i in mask_rows]
-
-
-def shift_left(mask_rows: list[int]) -> list[int]:
-	return [i << 1 for i in mask_rows]
-
-
-def process_jet(direction: str, mask_rows: list[int],
-				playfield_rows: list[int]) -> list[int]:
-	"""Shifts the mask rows in the specified direction if possible. Returns the
-	(possibly unchanged) mask rows."""
-	
-	if direction == ">":
-		if can_shift_right(mask_rows, playfield_rows):
-			return shift_right(mask_rows)
-	else:
-		if can_shift_left(mask_rows, playfield_rows):
-			return shift_left(mask_rows)
-	
-	return mask_rows
-
-
-def prepare_playing_field(pf: list[int], mask_rows: list[int]) \
-		-> tuple[int, int, list[int]]:
-	"""Prepares the next drop by putting three empty lines above the highest
-	column in the playing field"""
-	
-	# Why remove rows first and then add more rows?
-	# y_min is the lowest relevant row nr (the higest row containing rock)
-	y_min = len(pf) - 1
-	while not pf[y_min]:
-		y_min -= 1
-	
-	nr_mask_rows = len(mask_rows)
-	
-	# Add empty rows for new mask
-	pf.extend([0 for _ in range(nr_mask_rows)])
-	
-	# y_max is the highest
-	y_max = y_min + 3 + nr_mask_rows
-	
-	return y_min, y_max, pf
-
-
-# y_min = len(pf) - 1
-# while pf[y_min] == 0:
-# 	y_min -= 1
-# 	del pf[-1]
-#
-# pf.extend([0 for _ in range(3)])
-# nr_mask_rows = len(mask_rows)
-#
-# # Add empty rows for new mask
-# pf.extend([0 for _ in range(nr_mask_rows)])
-#
-# y_max = y_min + 3 + nr_mask_rows
-#
-# return y_min, y_max, pf
-
-
-# def get_repeat_key(pf: list[int]) -> int:
-# 	row_nr = -1
-# 	key_as_list = [0] * 7
-# 	while 0 not in key_as_list:
-# 		pf_row_value = pf[row_nr]
+	return any(i & j for i, j in zip(rock_rows, field_rows))
 
 
 def main() -> None:
-	pf = [127]
-	masks = [[30], [8, 28, 8], [28, 4, 4], [16, 16, 16, 16], [24, 24]]
-	use_test_data = False
+	"""Yeah!"""
+	
+	use_test_data = True
+	
 	if use_test_data:
 		file_name = "input_files/day17t1.txt"
 		print("Using test data")
 		expected_1 = 3068
-		expected_2 = 1_514_285_714_288
+		# expected_2 = 1_514_285_714_288
 	else:
 		file_name = "input_files/day17.txt"
 		print("Using real input data")
 		expected_1 = 3119
-		expected_2 = None
+		# expected_2 = None
+	
 	jet_stream = JetStream(file_name)
+	rock_shapes = [[30], [8, 28, 8], [28, 4, 4], [16, 16, 16, 16], [24, 24]]
+	pf = PlayField(jet_stream, rock_shapes)
 	
-	# repeat_info: dict[int, tuple[int, int]] = dict()
-	for n in range(2022):
-		mask_rows = masks[n % 5]
-		nr_mask_rows = len(mask_rows)
-		
-		# Remove rows from top until non-empty row (at max height)
-		y_min, y_max, pf = prepare_playing_field(pf, mask_rows)
-		print(f"{y_min=}, {y_max=}, {len(mask_rows)=}, {len(pf)=}", end='')
-		print(f"lrw start: pf[{y_max + 1 - nr_mask_rows}:{y_max + 1}]")
-		# Get pf rows against which we do initial moves to left or right
-		# Do moves left and right
-		while True:
-			left_right_window = pf[y_max + 1 - nr_mask_rows: y_max + 1]
-			mask_rows = process_jet(next(jet_stream), mask_rows,
-									left_right_window
-									)
-			down_window = pf[y_max - nr_mask_rows: y_max]
-			
-			if rows_overlap(mask_rows, down_window):
-				break
-			else:
-				y_min -= 1
-				y_max -= 1
-		
-		# Integrate mask in playing field
-		for i in range(nr_mask_rows):
-			pf[y_max - i] = mask_rows[nr_mask_rows - 1 - i] | pf[y_max - i]
-		
-		while not pf[-1]:
-			del pf[-1]
-	
-	# repeat_info[n] = (len(pf) - 1, jet_stream.offset)
-	# repeat_key = get_repeat_key(pf)
-	# if repeat_mask := repeat_info.get(repeat_key, None):
-	# 	if repeat_mask == mask_rows:
-	# 		print(f"repeat found: {n = }")
-	# else:
-	# 	repeat_info[repeat_key] = mask_rows
-	solution_1 = len(pf) - 1  # 3068 for test input, 3119 for real input,
-	assert solution_1 == expected_1
+	solution_1 = pf.get_height_after_drops(2022)  # 3068 for test input, 3119 for
+	# real input,
+	# solution_2 = pf.get_height_after_drops(1_000_000_000_000)
 	print(solution_1)
-
-
-# print_pf(pf)
-# for n, (length, jets) in repeat_info.items():
-# 	print(f"{n}, {length}, {jets}")
+	assert solution_1 == expected_1
 
 
 if __name__ == "__main__":
 	main()
+	exit(0)
