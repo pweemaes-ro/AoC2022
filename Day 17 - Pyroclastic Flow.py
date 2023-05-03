@@ -1,22 +1,25 @@
-"""Try 3..."""
+"""Day 17 - Pyroclastic Flow"""
+import operator
 import time
 from collections.abc import Iterator
-from typing import Final
+from typing import Callable, TypeAlias
 
 from AoCLib.IntsAndBits import bit_set
+
+Rock: TypeAlias = list[int]
+RowOffset: TypeAlias = int
 
 
 class JetStream:
 	"""A class to handle retrieval of jets and positioning in the stream."""
 	
 	def __init__(self, jet_file: str):
-		
 		with open(jet_file) as jet_stream:
 			self.__jets = jet_stream.readline()[:-1]
 		self._length = len(self.__jets)
-		self.__offset = 0
+		self._offset = 0
 		self._jets_yielded = 0
-		
+	
 	def __iter__(self) -> Iterator[str]:
 		"""The JetStream is an iterator itself..."""
 		
@@ -25,204 +28,226 @@ class JetStream:
 	def __next__(self) -> str:
 		"""Return the next char from the jetstream."""
 		
-		jet_char = self.__jets[self.__offset]
-		self.__offset = (self.__offset + 1) % self._length
+		jet_char = self.__jets[self._offset]
+		self._offset = (self._offset + 1) % self._length
 		self._jets_yielded += 1
 		return jet_char
-	
-	@property
-	def length(self) -> int:
-		"""Returns the length of the jetstream."""
-		
-		return self._length
 
+	def __len__(self) -> int:
+		return self._length
+	
 	@property
 	def jets_yielded(self) -> int:
 		"""Return the nr of jets processed since the last reset."""
 		
 		return self._jets_yielded
 
-		
+
 class PlayField(list[int]):
 	"""Representation of the play field (rows of rock), and functionality to
 	drop - in a tetris-like manner - rocks. The left/right movements of falling
 	rocks are controlled by the jets."""
 	
-	_colors: Final = '⚪🟢'
-	
-	def __init__(self, jet_stream: JetStream, rock_shapes: list[list[int]]) \
+	def __init__(self, jet_stream: JetStream, rocks: list[Rock]) \
 		-> None:
 		
 		super().__init__([127])  # First row is full, so falling through...
 		self._jet_stream = jet_stream
-		self._rock_shapes = rock_shapes
+		self._rocks = rocks
 		self._rocks_dropped = 0
-		# There are only five rock-shapes and only x = a finite nr of jet chars, so
-		# there is a cycle that takes exactly 5 * x jet chars.
-		self._jets_per_cycle = self._jet_stream.length * len(self._rock_shapes)
-		self._delta_height_per_cycle = 0
-		self._drops_at_start_of_first_cycle = 0
-		self._drops_per_cycle = 0
-		self._cycle_found = False
-		self._drops_to_heights: dict[int, int] = dict()
+		self._d2h: dict[int, int] = dict()  # nr dropped -> post drops height
+		self._drops_before_cycles = 0   # nr of rocks dropped before 1st cycle
+		self._cycle_drops = 0           # nr of rocks dropped in one cycle
+		self._delta_height_before_cycles = 0  # height reached before 1st cycle
+		self._cycle_height = 0                # delta height of one cycle
+		self._set_cycle_info()
 
-	def _can_move_to_right(self,
-						   rock_rows: list[int],
-						   play_field_rows: list[int]) -> bool:
+	@staticmethod
+	def _all_leftmost_bit_cleared(rock: Rock) -> bool:
+		"""Return True if rock values have leftmost bit cleared, else False."""
+
+		return not any(bit_set(n, 6) for n in rock)
+
+	@staticmethod
+	def _all_rightmost_bit_cleared(rock: Rock) -> bool:
+		"""Return True if rock values have rightmost bit cleared, else False."""
+
+		return not any(bit_set(n, 0) for n in rock)
+	
+	def _can_move_to_left(self, rock: Rock, play_field: list[int]) -> bool:
+		"""Return True if rock_rows can shift to the left, else return
+		False."""
+		
+		return self._all_leftmost_bit_cleared(rock) and \
+			not self._rows_overlap(self._shifted_left(rock), play_field)
+	
+	def _can_move_to_right(self, rock: Rock, play_field: list[int]) -> bool:
 		"""Return True if rock_rows can be shifted to the right, else return
 		False."""
 		
-		# We can move the rock rows to the right if:
-		# a) All rock rows have bit 0 equal to 0 (not already against the right
-		#    edge of the playing field), AND
-		# b) No bits in the play field overlap with where the rock would go
-		#    after shifting to the right.
-		return (not any(bit_set(n, bit_nr=0) for n in rock_rows)) and \
-			(not self.rows_overlap([i >> 1 for i in rock_rows], play_field_rows))
+		return self._all_rightmost_bit_cleared(rock) and \
+			not self._rows_overlap(self._shifted_right(rock), play_field)
 	
-	def _can_move_to_left(self,
-						  rock_rows: list[int],
-						  play_field_rows: list[int]) -> bool:
-		"""Return True if rock_rows can shift to the left, else return False."""
+	@staticmethod
+	def _shifted_right(rock: Rock) -> Rock:
+		"""Return (new) right shifted rock."""
 		
-		# We can move the rock rows to the left if:
-		# a) All rock rows have bit 6 equal to 0 (not already against the left
-		#    edge of the playing field), AND
-		# b) No bits in the play field overlap with where the rock would go
-		#    after shifting to the left.
-		return (not any(bit_set(n, bit_nr=6) for n in rock_rows)) and \
-			(not self.rows_overlap([i << 1 for i in rock_rows], play_field_rows))
+		return [i >> 1 for i in rock]
 	
-	def try_move_sideways(self, rock_rows: list[int],
-						  play_field_rows: list[int]) -> list[int]:
-		"""Shifts the rock rows in the specified direction if possible. Returns
-		the (possibly unchanged) rock rows."""
+	@staticmethod
+	def _shifted_left(rock: Rock) -> Rock:
+		"""Return (new) left shifted rock."""
+		
+		return [i << 1 for i in rock]
+	
+	def _try_move_down(self, rock: Rock, rock_start_offset: int) -> bool:
+		"""Return True if rock can move down one unit, else False."""
+		
+		destination = self[rock_start_offset - 1:
+		                   rock_start_offset - 1 + len(rock)]
+		
+		# We can move down if there is no overlap between the rock when
+		# 'projected' on its destination rows in the playing field.
+		return not self._rows_overlap(rock, destination)
+	
+	def _try_move_sideways(self, rock: Rock, rock_start_offset: int) -> Rock:
+		"""Shifts the rock in the specified direction if possible. Returns the
+		(shifted or unchanged) rock."""
+		
+		destination = self[rock_start_offset: rock_start_offset + len(rock)]
 		
 		direction = next(self._jet_stream)
 		
 		if direction == ">":
-			if self._can_move_to_right(rock_rows, play_field_rows):
-				return [i >> 1 for i in rock_rows]
+			if self._can_move_to_right(rock, destination):
+				return self._shifted_right(rock)
 		else:
-			if self._can_move_to_left(rock_rows, play_field_rows):
-				return [i << 1 for i in rock_rows]
+			if self._can_move_to_left(rock, destination):
+				return self._shifted_left(rock)
 		
-		return rock_rows
+		# If move sideways was not possible, return unchanged rock rows!
+		return rock
+	
+	def _put_on_playfield(self, rock: Rock, rock_start_offset: int) -> None:
+		"""Puts the rock on the playing field and then stores the height so we
+		can re-use it during cycle-detection!"""
+		
+		for i in range(len(rock)):
+			self[rock_start_offset + i] |= rock[i]
+		
+		self._d2h[self._rocks_dropped] = self._height
+		
+	@property
+	def _jets_yielded(self) -> int:
+		"""Return the nr of jets yielded so far."""
+		
+		return self._jet_stream.jets_yielded
 	
 	@property
-	def height(self) -> int:
+	def _height(self) -> int:
 		"""Return the height of the play field (which is not necessarily the
 		same as the nr of rows, since there may be empty rows on the top of
 		the play field)."""
-
+		
 		empty_rows = 0
 		while not self[- (empty_rows + 1)]:
 			empty_rows += 1
-			
+		
 		return len(self) - empty_rows - 1
-
-	def _drop_next_rock(self) -> None:
-		"""Drop a rock."""
+	
+	def _prepare_drop(self) -> tuple[Rock, int]:
+		"""Return the rock to drop and the row nr of the rock's bottom row."""
 		
-		rock_shape = self._rock_shapes[self._rocks_dropped % 5]
+		rock = self._rocks[self._rocks_dropped % 5]
 		self._rocks_dropped += 1
-		rock_height = len(rock_shape)
-		
-		# Make sure there are sufficient empty rows.
+
+		# Make sure there are exactly 4 (the largest height of all blocks)
+		# empty top rows on the playing field.
 		while not self[-1]:
 			del self[-1]
-		self.extend([0] * 4)  # 4 is the largest height of all blocks!
+		self.extend([0] * 4)
 		
-		rock_bottom_row = len(self) - 1
+		return rock, len(self) - 1
+	
+	def _drop_next_rock(self) -> None:
+		"""Drop a rock."""
+
+		rock, rock_start_offset = self._prepare_drop()
 		
 		while True:
 			# Try to move one position to the left or right
-			sideways_window = self[
-							  rock_bottom_row: rock_bottom_row + rock_height]
-			rock_shape = self.try_move_sideways(rock_shape, sideways_window)
+			rock = self._try_move_sideways(rock, rock_start_offset)
 			
-			down_window = self[rock_bottom_row - 1:
-							   rock_bottom_row - 1 + rock_height]
-			
-			# We can move down if there is no overlap between the rock_shape
-			# when 'projected' on its location after moving down.
-			if self.rows_overlap(rock_shape, down_window):
-				break
+			# Try to move one position down. Stop if it failed.
+			if self._try_move_down(rock, rock_start_offset):
+				rock_start_offset -= 1
 			else:
-				rock_bottom_row -= 1
-		
-		# The rock cannot move down anymore, put it at its location in the
-		# playfield.
-		for i in range(rock_height):
-			self[rock_bottom_row + i] |= rock_shape[i]
-		
-		self._drops_to_heights[self._rocks_dropped] = self.height
-	
-	def _find_cycle(self) -> None:
-
-		jet_offset_at_start_of_second_cycle = -1
-	
-		while True:
-			if not self._drops_at_start_of_first_cycle and \
-				self._jet_stream.jets_yielded >= self._jets_per_cycle:
-				
-				self._drops_at_start_of_first_cycle = self._rocks_dropped
-
-				jet_offset_at_start_of_second_cycle = \
-					self._jet_stream.jets_yielded + self._jets_per_cycle
-
-				self._drop_next_rock()
-
-			elif self._jet_stream.jets_yielded == \
-				jet_offset_at_start_of_second_cycle:
-
-				self._delta_height_per_cycle = \
-					self.height - \
-					self._drops_to_heights[self._drops_at_start_of_first_cycle]
-				self._drops_per_cycle = \
-					self._rocks_dropped - \
-					self._drops_at_start_of_first_cycle
-
 				break
+		
+		self._put_on_playfield(rock, rock_start_offset)
+	
+	def _drop_until_jet_offset(self,
+	                           jet_offset: int,
+	                           cmp: Callable[[int, int], bool]) -> int:
+		"""Drop rocks until compare of processed jets and jet_offset is True.
+		Returns nr of drops executed."""
+		
+		drops_at_start = self._rocks_dropped
+		while not cmp(self._jets_yielded, jet_offset):
+			self._drop_next_rock()
 			
-			else:
-				self._drop_next_rock()
+		return self._rocks_dropped - drops_at_start
+	
+	def _set_cycle_info(self) -> None:
+		"""Set all relevent cycle data."""
 		
-		self._cycle_found = True
-
-	def height_after_drops(self, total_drops: int) -> int:
-		"""Return the height after dropping total_drops rocks."""
-
-		if not self._cycle_found:
-			self._find_cycle()
+		jets_per_cycle = len(self._jet_stream) * len(self._rocks)
 		
-		nr_cycles, drops_in_lead_out = \
-			divmod(total_drops - self._drops_at_start_of_first_cycle,
-				self._drops_per_cycle)
-		in_cycles_height = nr_cycles * self._delta_height_per_cycle
+		# The only invariant is the nr of jets for each cycle. The nr of rocks
+		# dropped before and in a cycle depends on where earlier rocks came to
+		# rest. So irst we drop rocks until we are sure we are INSIDE a cycle,
+		# that is, we have processed AT LEAST the the invariant nr of jets.
+		# This gives the nr of drops and the height just before the first cycle
+		# starts.
 		
-		lead_out_height = \
-			self._drops_to_heights[self._drops_at_start_of_first_cycle +
-								   drops_in_lead_out] - \
-			self._drops_to_heights[self._drops_at_start_of_first_cycle]
+		self._drops_before_cycles = \
+			self._drop_until_jet_offset(jets_per_cycle, operator.ge)
+		self._delta_height_before_cycles = self._d2h[self._drops_before_cycles]
 
-		return self._drops_to_heights[self._drops_at_start_of_first_cycle] + \
-			in_cycles_height + \
-			lead_out_height
+		# Now we drop until we have processed an additional jets_per_cycle.
+		# This gives the nr of drops in eaach cycle and the increase in height
+		# of each cycle.
+		self._cycle_drops = \
+			self._drop_until_jet_offset(self._jets_yielded
+			                            + jets_per_cycle, operator.eq)
+		self._cycle_height = self._height - self._delta_height_before_cycles
+		
+	def get_tallest_tower(self, nr_drops: int) -> int:
+		"""Return the height of the tower of rocks after nr_drops rocks have
+		stopped falling. This is determined by calculation, based on analysis
+		of cyclicity, not by simmulating all drops. (Only the drops required to
+		get to the beginning of the 2nd cycle are actually simulated, see
+		self._set_cycle_info method)."""
+		
+		nr_cycles, drops_after_cycles = \
+			divmod(nr_drops - self._drops_before_cycles, self._cycle_drops)
 
-	# def __str__(self) -> str:
-	# 	"""Print the field. Uses ⚪ for spaces, 🟢 for rocks."""
-	#
-	# 	return '\n'.join(f"{len(self) - 1 - row_nr:4d}: "
-	# 					 f"{''.join(self._colors[int(c)] for c in f'{r:07b}')}"
-	# 					 for row_nr, r in enumerate(self[::-1]))
+		delta_height_in_cycles = nr_cycles * self._cycle_height
 
+		delta_height_after_cycles = \
+			self._d2h[self._drops_before_cycles + drops_after_cycles] \
+			- self._delta_height_before_cycles
+		
+		return self._delta_height_before_cycles \
+			+ delta_height_in_cycles \
+			+ delta_height_after_cycles
+	
 	@staticmethod
-	def rows_overlap(rock_rows: list[int], field_rows: list[int]) -> bool:
-		"""Return True if any row in rock_rows overlaps with its corresponding row
-		in field_rows, else False."""
+	def _rows_overlap(rock: Rock, play_field: list[int]) -> bool:
+		"""Return True if any row in rock_rows overlaps with its corresponding
+		row in field_rows, else False."""
 		
-		return any(i & j for i, j in zip(rock_rows, field_rows))
+		return any(i & j for i, j in zip(rock, play_field))
 
 
 def main() -> None:
@@ -233,25 +258,43 @@ def main() -> None:
 	part_2 = "How tall will the tower be after 1000000000000 rocks have " \
 	         "stopped?"
 	
-	# use_test_data = False
-	#
-	# if use_test_data:
-	# 	file_name = "input_files/day17t1.txt"
-	# 	expected_1 = 3068
-	# 	expected_2 = 1514285714288
-	# else:
-	# 	file_name = "input_files/day17.txt"
-	# 	expected_1 = 3119
-	# 	expected_2 = 1536994219669
-	
 	start = time.perf_counter_ns()
 	
 	jet_stream = JetStream("input_files/day17.txt")
-	rock_shapes = [[30], [8, 28, 8], [28, 4, 4], [16, 16, 16, 16], [24, 24]]
-	pf = PlayField(jet_stream, rock_shapes)
-
-	solution_1 = pf.height_after_drops(2022)
-	solution_2 = pf.height_after_drops(1_000_000_000_000)
+	rocks: list[Rock] = [
+		[30],
+		# rock shape:
+		# 🟢🟢🟢🟢
+		
+		[8, 28, 8],
+		# rock shape:
+		# ⚪🟢⚪
+		# 🟢🟢🟢
+		# ⚪🟢⚪
+		
+		[28, 4, 4],
+		# rock shape:
+		# ⚪⚪🟢
+		# ⚪⚪🟢
+		# 🟢🟢🟢
+		
+		[16, 16, 16, 16],
+		# rock shape:
+		# 🟢
+		# 🟢
+		# 🟢
+		# 🟢
+		
+		[24, 24]
+		# rock shape:
+		# 🟢🟢
+		# 🟢🟢
+	]
+	
+	play_field = PlayField(jet_stream, rocks)
+	
+	solution_1 = play_field.get_tallest_tower(2022)
+	solution_2 = play_field.get_tallest_tower(1_000_000_000_000)
 	
 	stop = time.perf_counter_ns()
 	
